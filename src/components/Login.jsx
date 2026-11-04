@@ -11,7 +11,7 @@ export default function Login() {
     const em = email.trim().toLowerCase();
     if (!em.endsWith(DOMINIO)) { setStato({ err: `Serve la mail aziendale ${DOMINIO}` }); return; }
     setBusy(true); setStato(null);
-    const { error } = await supabase.auth.signInWithOtp({ email: em, options: { emailRedirectTo: location.origin, shouldCreateUser: true } });
+    const { error } = await supabase.auth.signInWithOtp({ email: em, options: { emailRedirectTo: location.origin + import.meta.env.BASE_URL, shouldCreateUser: true } });
     setBusy(false);
     if (error) {
       const msg = /database error|non autorizzata/i.test(error.message)
