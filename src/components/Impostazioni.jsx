@@ -170,8 +170,7 @@ function Numeri({ me }) {
     <div className="card" style={{ marginBottom: 16 }}>
       <h3>Numeri aziendali</h3>
       <p className="small muted">
-        L'AI usa nelle bozze <b>solo</b> i numeri con la spunta verde. Quelli <b>automatici</b> si ricalcolano ogni notte da Notion (Dashboard Headsets, San Martino escluso).
-        Gli altri li gestisci tu: modificali quando cambiano, togli la conferma se non sono più validi.
+        L'AI usa nelle bozze <b>solo</b> i numeri con la spunta verde. Li gestisci tu: modificali quando cambiano, togli la conferma se non sono più validi.
       </p>
       <table className="tbl"><thead><tr><th>Dato</th><th>Valore</th><th>Fonte</th><th>Stato</th><th /></tr></thead><tbody>
         {facts.map(f => <RigaNumero key={f.id} f={f} me={me} salva={salva} elimina={elimina} />)}

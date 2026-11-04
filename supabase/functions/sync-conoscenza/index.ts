@@ -1,7 +1,7 @@
-// Aggiorna la base di conoscenza: Lemons Insights + fonti Notion (tabella fonti_notion) + numeri calcolati.
+// Aggiorna la base di conoscenza: Lemons Insights + fonti Notion (tabella fonti_notion).
 // Invocata dal cron notturno o dal pulsante "Aggiorna ora".
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { leggiInsights, leggiNotion, calcolaFatti } from '../_shared/fonti.ts';
+import { leggiInsights, leggiNotion } from '../_shared/fonti.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -48,7 +48,7 @@ Deno.serve(async req => {
     }
   } catch (e) { errori.push('Insights: ' + e); }
 
-  // 2. Notion (fonti attive in tabella) + numeri calcolati
+  // 2. Notion (fonti attive in tabella)
   let token = Deno.env.get('NOTION_TOKEN') || '';
   if (!token) { const { data } = await db.rpc('leggi_segreto', { nome: 'NOTION_TOKEN' }); token = data || ''; }
   if (!token) report.notion = 'Chiave Notion non configurata: saltato';
@@ -69,12 +69,6 @@ Deno.serve(async req => {
         report.notion_rimossi = via.length;
       }
     } catch (e) { errori.push('Notion: ' + e); }
-    try {
-      const fatti = await calcolaFatti(token);
-      const ora = new Date().toISOString();
-      const { error } = await db.from('facts').upsert(fatti.map(f => ({ ...f, automatico: true, calcolato_il: ora, confermato_da: 'automatico', confermato_il: ora, note: null })), { onConflict: 'chiave' });
-      if (error) errori.push('fatti: ' + error.message); else report.fatti = fatti.map(f => `${f.etichetta}: ${f.valore}`);
-    } catch (e) { errori.push('Fatti: ' + e); }
   }
 
   const ok = errori.length === 0;

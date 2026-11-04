@@ -154,26 +154,3 @@ export async function leggiInsights() {
   }
   return { chunks, errori };
 }
-
-// ── Numeri aziendali calcolati da Notion (Dashboard Headsets). San Martino sempre escluso. ──
-export async function calcolaFatti(token: string) {
-  const DB = '333e69fb-b9e6-8084-b66c-c0e70e928033';
-  const righe: any[] = [];
-  let cur: string | undefined;
-  do {
-    const r: any = await nfetch(token, `databases/${DB}/query`, { page_size: 100, ...(cur ? { start_cursor: cur } : {}) });
-    righe.push(...r.results);
-    cur = r.has_more ? r.next_cursor : undefined;
-  } while (cur);
-  const osp = (p: any) => valore(p.properties['Ospedale per group']) || '';
-  const valide = righe.filter(p => (valore(p.properties['Serial number']) || '').trim() && !/san martino/i.test(osp(p)) && !/associazion/i.test(osp(p)) && osp(p).trim());
-  const ospedali = new Set(valide.map(osp));
-  const sessioniQ = valide.reduce((a, p) => a + (Number(valore(p.properties['Quarter sessions'])) || 0), 0);
-  const trimestre = valore(valide.find(p => valore(p.properties['Quarter']))?.properties['Quarter']) || '';
-  const fonte = 'Notion · Dashboard Headsets (calcolo automatico, San Martino e associazioni esclusi)';
-  return [
-    { chiave: 'auto_ospedali_flotta', etichetta: 'Ospedali con visori LEMO monitorati', valore: String(ospedali.size), fonte },
-    { chiave: 'auto_visori_flotta', etichetta: 'Visori LEMO monitorati negli ospedali', valore: String(valide.length), fonte },
-    { chiave: 'auto_sessioni_trimestre', etichetta: `Sessioni nel trimestre ${trimestre}`.trim(), valore: String(sessioniQ), fonte },
-  ];
-}
