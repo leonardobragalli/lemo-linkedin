@@ -63,14 +63,7 @@ function Membro({ m, storico, posts, me, applica }) {
           <button className="btn sm">Salva</button>
         </form>
       )}
-      {me.is_admin && (
-        <div className="row tight">
-          <input type="email" placeholder="email DA CHIEDERE" value={email} onChange={e => setEmail(e.target.value)} />
-          <button className="btn ghost sm" onClick={salvaEmail} disabled={(m.email || '') === email.trim().toLowerCase()}>Salva email</button>
-          {m.id !== me.id && <button className="btn ghost sm" onClick={toggleAdmin}>{m.is_admin ? 'Togli admin' : 'Rendi admin'}</button>}
-        </div>
-      )}
-      {!m.email && <div className="small errtxt">Nessuna email: non può ancora entrare.</div>}
+      {!m.email && <div className="small errtxt">Non ancora invitato{me.is_admin ? ' (Impostazioni → Team e inviti)' : ''}.</div>}
       {puo && <div className="row tight"><button className="btn ghost xs" onClick={async () => setBanner(await bannerProfilo(m, 1, m.id === 'lazar' ? 'en' : 'it'))}>Genera banner profilo</button>
         {banner && <a className="small" href={banner} download={`Banner_${m.id}.jpg`}>↓ scarica</a>}</div>}
       {banner && <img className="banner-img" src={banner} alt="banner" />}

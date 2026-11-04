@@ -100,3 +100,9 @@ main { padding: 18px 20px 60px; max-width: 1600px; margin: 0 auto; }
 @media (max-width: 900px) {
   .week { grid-template-columns: 1fr; } .dr-body { grid-template-columns: 1fr; } .top { flex-wrap: wrap; }
 }
+
+/* Impostazioni */
+.tbl td .col { display: flex; flex-direction: column; }
+.tbl.inviti td { vertical-align: top; padding-top: 10px; padding-bottom: 10px; }
+.tbl th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; padding: 6px 8px; }
+.tbl td input:not([type=checkbox]):not([type=color]) { width: 100%; }

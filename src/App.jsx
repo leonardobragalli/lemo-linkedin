@@ -9,6 +9,7 @@ import Analisi from './components/Analisi.jsx';
 import Team from './components/Team.jsx';
 import Impara from './components/Impara.jsx';
 import Collega from './components/Collega.jsx';
+import Impostazioni from './components/Impostazioni.jsx';
 import { avatar } from './lib/util.js';
 
 const VISTE = [
@@ -18,6 +19,7 @@ const VISTE = [
   { id: 'impara', label: 'Cosa sta imparando' },
   { id: 'team', label: 'Team & follower' },
   { id: 'collega', label: 'Collega LinkedIn' },
+  { id: 'impostazioni', label: 'Impostazioni', admin: true },
 ];
 
 export default function App() {
@@ -57,9 +59,9 @@ function Shell({ session }) {
   return (
     <div className="app">
       <header className="top">
-        <div className="brand">🍋 <b>Regia LinkedIn</b> <span className="muted">Lemons in the Room</span></div>
+        <div className="brand">🍋 <b>Regia LinkedIn</b> <span className="muted">Lemons in the room</span></div>
         <nav>
-          {VISTE.map(v => (
+          {VISTE.filter(v => !v.admin || me.is_admin).map(v => (
             <button key={v.id} className={'tab' + (vista === v.id ? ' on' : '')} onClick={() => setVista(v.id)}>{v.label}</button>
           ))}
         </nav>
@@ -77,6 +79,7 @@ function Shell({ session }) {
         {vista === 'team' && <Team {...ctx} />}
         {vista === 'impara' && <Impara {...ctx} />}
         {vista === 'collega' && <Collega {...ctx} />}
+        {vista === 'impostazioni' && <Impostazioni {...ctx} />}
       </main>
       {postAperto && <Editor key={postAperto.id} post={postAperto} {...ctx} chiudi={() => setAperto(null)} />}
     </div>

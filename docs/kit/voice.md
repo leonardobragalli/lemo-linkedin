@@ -2,6 +2,7 @@
 
 - Italiano corretto con **tutti gli accenti e gli apostrofi**: è, perché, più, già, realtà, continuità, sanità, qualità, l'altro. Mai "e" al posto di "è", mai "perche", mai "realta".
 - Lazar scrive in inglese; tutti gli altri in italiano.
+- Il nome dell'azienda si scrive sempre **Lemons in the room** (r minuscola), mai "Room".
 - Niente markdown (asterischi, cancelletti per titoli): LinkedIn mostra il testo così com'è.
 
 ---
@@ -13,7 +14,7 @@ Filled in on 14 Oct 2026 from Matteo's CV, his profile notes and company
 documents. Anything marked `{{da confermare}}` is an inference that Matteo has
 not yet confirmed: do not present it as fact in a post until he does.
 
-Main use: LinkedIn for **Lemons in the Room**.
+Main use: LinkedIn for **Lemons in the room**.
 
 ---
 
@@ -22,7 +23,7 @@ Main use: LinkedIn for **Lemons in the Room**.
 - **Name:** Dr Matteo Era
 - **Profile:** linkedin.com/in/matteo-era-a70288387
 - **What I do, in one sentence:** Medical doctor and Head of Clinical Research
-  and Development at Lemons in the Room, where I run the clinical research
+  and Development at Lemons in the room, where I run the clinical research
   programme behind LEMO, an immersive virtual-reality device used in hospitals
   during treatments and procedures.
 - **Background (verified, from the CV):** MD, University of Florence,
@@ -41,7 +42,7 @@ Main use: LinkedIn for **Lemons in the Room**.
   3. clinical researchers who could become investigators or partner centres,
      in Italy and abroad (Spain, Malta).
 - **What I sell:** I write as Head of Clinical Research and Development of
-  Lemons in the Room, so I speak for the company and I present LEMO: what it
+  Lemons in the room, so I speak for the company and I present LEMO: what it
   is, how it is used on the ward, where it is being studied, the company's
   milestones. The limits are in "Off limits": what can be said about LEMO
   (its CE intended purpose) and how (information, not public advertising
@@ -54,7 +55,7 @@ Main use: LinkedIn for **Lemons in the Room**.
      digital health.
   `{{da confermare: ordine di priorità}}`
 
-## Lemons in the Room: facts a post can use
+## Lemons in the room: facts a post can use
 
 - Florence company that brings immersive virtual reality into hospitals;
   partner hospitals in Italy, expansion to Spain and Malta.
@@ -222,7 +223,7 @@ links in the text unless Matteo asks. The evidence works behind the scenes.
    information, not formal advertising (D.Lgs. 137/2022 art. 26; Codice
    deontologico art. 57).
 9. When a post is about virtual reality, it makes clear that I work for
-   Lemons in the Room (a closing line, or naturally in the text).
+   Lemons in the room (a closing line, or naturally in the text).
 
 ## My positions
 
@@ -283,7 +284,7 @@ Verified and already public (CV, profile):
 
 - MD 110/110, University of Florence, Oct 2026; registered physician,
   Florence, 14 Oct 2026.
-- Head of Clinical Research and Development, Lemons in the Room, since
+- Head of Clinical Research and Development, Lemons in the room, since
   Nov 2025.
 - Clinical research with partner hospitals in five areas: oncology,
   paediatrics, gynaecology, emergency care, cardiac electrophysiology.

@@ -6,17 +6,16 @@ export type Chunk = {
   testo: string; area: string | null; meta: Record<string, unknown>;
 };
 
-// Whitelist: vedi docs/FONTI_CONOSCENZA.md. Campi esclusi = note interne/tecniche.
-export const NOTION_DBS: { id: string; nome: string; escludi: string[]; filtro?: (p: Record<string, string>) => boolean; corpo: boolean }[] = [
-  { id: '299e69fb-b9e6-807f-a025-c86ddaa82bf2', nome: 'Paper clinici', escludi: [], corpo: true },
-  { id: '2fae69fb-b9e6-800e-9abd-f5348624ecf1', nome: 'Press', escludi: [], corpo: false },
-  { id: '6f5b386b-4059-4902-b773-0d2d1d9288f8', nome: 'Blog', escludi: ['Meta Description (1)'], corpo: true,
-    filtro: p => /ready|publish|pubblicat|live/i.test(p['Status'] || '') && !/nascost/i.test(p['Category'] || '') },
-  { id: '1e2a1b2b-052e-4339-bcd6-26fa6b1d72de', nome: 'Procedure', escludi: ['Developer Notes', 'Mapping Status'], corpo: false },
-  { id: 'ed33d2fa-b897-4aba-b180-50b5a5790b19', nome: 'Esperienze LEMO', escludi: ['Unity Scene', 'Version', 'Status', 'Fallback Mode', 'Transcript'], corpo: false },
-  { id: '267e69fb-b9e6-8000-8b31-ffea0c38cd04', nome: 'Post social passati', escludi: [], corpo: true,
-    filtro: p => /published/i.test(p['Status'] || '') && /linkedin/i.test(p['Platform'] || '') },
-];
+// Fonti Notion: configurate nella tabella `fonti_notion` (modificabile dal sito da un admin).
+export type FonteNotion = {
+  db_id: string; nome: string; corpo: boolean; campi_esclusi: string[];
+  filtro_campo?: string | null; filtro_regex?: string | null; escludi_campo?: string | null; escludi_regex?: string | null;
+};
+function passaFiltri(f: FonteNotion, props: Record<string, string>) {
+  if (f.filtro_campo && f.filtro_regex && !new RegExp(f.filtro_regex, 'i').test(props[f.filtro_campo] || '')) return false;
+  if (f.escludi_campo && f.escludi_regex && new RegExp(f.escludi_regex, 'i').test(props[f.escludi_campo] || '')) return false;
+  return true;
+}
 
 const NV = '2022-06-28';
 // Righe dei modelli di pagina Notion, senza contenuto reale
@@ -73,24 +72,24 @@ async function testoPagina(token: string, id: string, max = 120): Promise<string
 }
 
 // Restituisce i pezzi delle pagine cambiate dopo `visti[id] = last_edited_time`.
-export async function leggiNotion(token: string, visti: Record<string, string>, limitePagine = 80) {
+export async function leggiNotion(token: string, fonti: FonteNotion[], visti: Record<string, string>, limitePagine = 80) {
   const chunks: (Chunk & { last_edited: string })[] = [];
   const presenti: string[] = [];
   const errori: string[] = [];
   let lette = 0;
-  for (const db of NOTION_DBS) {
+  for (const db of fonti) {
     let cur: string | undefined;
     try {
       do {
-        const r: any = await nfetch(token, `databases/${db.id}/query`, { page_size: 100, ...(cur ? { start_cursor: cur } : {}) });
+        const r: any = await nfetch(token, `databases/${db.db_id}/query`, { page_size: 100, ...(cur ? { start_cursor: cur } : {}) });
         for (const p of r.results) {
           const props: Record<string, string> = {};
           let titolo = '';
           for (const [k, v] of Object.entries<any>(p.properties)) {
             if (v.type === 'title') titolo = valore(v);
-            else if (!db.escludi.includes(k)) { const s = valore(v); if (s) props[k] = s; }
+            else if (!(db.campi_esclusi || []).includes(k)) { const s = valore(v); if (s) props[k] = s; }
           }
-          if (db.filtro && !db.filtro(props)) continue;
+          if (!passaFiltri(db, props)) continue;
           presenti.push(p.id);
           if (visti[p.id] === p.last_edited_time) continue;
           if (lette >= limitePagine) continue;
@@ -154,4 +153,27 @@ export async function leggiInsights() {
     }
   }
   return { chunks, errori };
+}
+
+// ── Numeri aziendali calcolati da Notion (Dashboard Headsets). San Martino sempre escluso. ──
+export async function calcolaFatti(token: string) {
+  const DB = '333e69fb-b9e6-8084-b66c-c0e70e928033';
+  const righe: any[] = [];
+  let cur: string | undefined;
+  do {
+    const r: any = await nfetch(token, `databases/${DB}/query`, { page_size: 100, ...(cur ? { start_cursor: cur } : {}) });
+    righe.push(...r.results);
+    cur = r.has_more ? r.next_cursor : undefined;
+  } while (cur);
+  const osp = (p: any) => valore(p.properties['Ospedale per group']) || '';
+  const valide = righe.filter(p => (valore(p.properties['Serial number']) || '').trim() && !/san martino/i.test(osp(p)) && !/associazion/i.test(osp(p)) && osp(p).trim());
+  const ospedali = new Set(valide.map(osp));
+  const sessioniQ = valide.reduce((a, p) => a + (Number(valore(p.properties['Quarter sessions'])) || 0), 0);
+  const trimestre = valore(valide.find(p => valore(p.properties['Quarter']))?.properties['Quarter']) || '';
+  const fonte = 'Notion · Dashboard Headsets (calcolo automatico, San Martino e associazioni esclusi)';
+  return [
+    { chiave: 'auto_ospedali_flotta', etichetta: 'Ospedali con visori LEMO monitorati', valore: String(ospedali.size), fonte },
+    { chiave: 'auto_visori_flotta', etichetta: 'Visori LEMO monitorati negli ospedali', valore: String(valide.length), fonte },
+    { chiave: 'auto_sessioni_trimestre', etichetta: `Sessioni nel trimestre ${trimestre}`.trim(), valore: String(sessioniQ), fonte },
+  ];
 }

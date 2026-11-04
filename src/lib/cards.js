@@ -85,7 +85,7 @@ function estraiTreKpiCollega(prof, pData, v){
   if (Array.isArray(v.kpi)) {
     const k = v.kpi.filter(x => x && x.val).slice(0, 3);
     if (k.length) return k;
-    return [{ tag: 'DISPOSITIVO', val: 'LEMO', desc: 'Dispositivo medico CE' }, { tag: 'TEAM', val: 'Lemons', desc: 'in the Room' }, { tag: 'FIRENZE', val: '🍋', desc: 'Realtà virtuale in ospedale' }];
+    return [{ tag: 'DISPOSITIVO', val: 'LEMO', desc: 'Dispositivo medico CE' }, { tag: 'TEAM', val: 'Lemons', desc: 'in the room' }, { tag: 'FIRENZE', val: '🍋', desc: 'Realtà virtuale in ospedale' }];
   }
   const isEn = (prof.id === 'lazar');
   const pid = pData.id;
@@ -112,7 +112,7 @@ function estraiTreKpiCollega(prof, pData, v){
     '18': [isEn ? 'DRESSING ANXIETY' : 'ANSIA MEDICAZIONE', 'SMD -0,83', isEn ? 'Hands-free bedside scenes' : 'Scenari bedside senza cavi', isEn ? 'BEDSIDE TIMING' : 'AVVIO BEDSIDE', 'T - 5 min', isEn ? '10s tablet start · 45s wipe' : '10s da tablet · igiene 45s']
   };
   // [lemo-linkedin] post nuovi senza slot: niente numeri presi da altri post
-  const sec = SLOT_SECONDARY_KPIS[pid] || [isEn ? 'DEVICE' : 'DISPOSITIVO', 'LEMO', isEn ? 'CE-marked medical device' : 'Dispositivo medico CE', 'TEAM', 'Lemons', 'in the Room'];
+  const sec = SLOT_SECONDARY_KPIS[pid] || [isEn ? 'DEVICE' : 'DISPOSITIVO', 'LEMO', isEn ? 'CE-marked medical device' : 'Dispositivo medico CE', 'TEAM', 'Lemons', 'in the room'];
   return [
     { tag: isEn ? 'PRIMARY METRIC' : 'DATO PRIMARIO', val: mVal, desc: mLbl },
     { tag: sec[0], val: sec[1], desc: sec[2] },
@@ -277,7 +277,7 @@ function generaSvgCardCollega(prof, pData, idxSlot, tipo, includeFonts){
   const foto1 = pool.photos[(idxSlot * 3 + pIdx * 5) % nPhotos] || '';
   const foto2 = pool.photos[(idxSlot * 3 + pIdx * 5 + 4) % nPhotos] || foto1;
   const uid = `${prof.id}_${pData.id}_${tipo}`;
-  const ruoloBreve = prof.ruolo.replace('@ Lemons in the Room', '').replace('· Lemons in the Room', '').trim();
+  const ruoloBreve = prof.ruolo.replace(/[@·]\s*Lemons in the room/i, '').trim();
   const fontCssTag = (includeFonts && window.LEMONS_FONTS_CSS) ? `<style>${window.LEMONS_FONTS_CSS}</style>` : '';
   const kpis = estraiTreKpiCollega(prof, pData, v);
   const isEn = (prof.id === 'lazar');

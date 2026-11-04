@@ -26,7 +26,7 @@ export default function Login() {
       <form className="card" onSubmit={invia}>
         <div className="big">🍋</div>
         <h1>Regia LinkedIn</h1>
-        <p className="muted">Lemons in the Room · accesso riservato al team</p>
+        <p className="muted">Lemons in the room · accesso riservato al team</p>
         <input type="email" placeholder={`nome${DOMINIO}`} value={email} onChange={e => setEmail(e.target.value)} autoFocus required />
         <button className="btn" disabled={busy}>{busy ? 'Invio…' : 'Mandami il link di accesso'}</button>
         {stato?.err && <p className="err">{stato.err}</p>}
