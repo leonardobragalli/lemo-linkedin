@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { STATI, partiRoma, fmtData, lunediDi, addGiorni, oggiYmd, primaRiga, GIORNI_LUNGHI } from '../lib/util.js';
+import { avatar, STATI, partiRoma, fmtData, lunediDi, addGiorni, oggiYmd, primaRiga, GIORNI_LUNGHI } from '../lib/util.js';
 
 export function Chip({ post, member, onClick, compatto }) {
   const st = STATI[post.stato];
@@ -8,7 +8,7 @@ export function Chip({ post, member, onClick, compatto }) {
   return (
     <button className="chip" style={{ borderLeftColor: member?.colore || '#999' }} onClick={onClick} title={primaRiga(post.testo)}>
       <div className="chip-top">
-        <img className="av xs" src={`/avatars/${post.member_id}.jpg`} alt="" />
+        <img className="av xs" src={avatar(post.member_id)} alt="" />
         <b>{p ? `${p.hh}:${p.mm}` : '—'}</b>
         <span className="muted">{member?.nome_breve || post.member_id}</span>
       </div>

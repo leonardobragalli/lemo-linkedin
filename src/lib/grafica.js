@@ -1,6 +1,6 @@
 // Carica gli asset grafici (font + archivio foto) e genera le tavole dei colleghi.
 import { generaSvgCardCollega, generaBannerProfiloCollega, rasterizzaSvgInBlobUrl } from './cards.js';
-import { immaginiMatteo } from './util.js';
+import { immaginiMatteo, asset } from './util.js';
 
 let assetsPromise = null;
 const avatarCache = {};
@@ -8,8 +8,8 @@ const avatarCache = {};
 export function caricaAsset() {
   if (!assetsPromise) {
     assetsPromise = Promise.all([
-      fetch('/assets/fonts.css').then(r => r.text()),
-      fetch('/assets/photo_pool.json').then(r => r.json()),
+      fetch(asset('assets/fonts.css')).then(r => r.text()),
+      fetch(asset('assets/photo_pool.json')).then(r => r.json()),
     ]).then(([css, pool]) => {
       window.LEMONS_FONTS_CSS = css;
       window.LEMONS_PHOTO_POOL = pool;
@@ -21,7 +21,7 @@ export function caricaAsset() {
 async function avatarDataUri(id) {
   if (avatarCache[id]) return avatarCache[id];
   try {
-    const blob = await fetch(`/avatars/${id}.jpg`).then(r => (r.ok ? r.blob() : null));
+    const blob = await fetch(asset(`avatars/${id}.jpg`)).then(r => (r.ok ? r.blob() : null));
     if (!blob) return '';
     avatarCache[id] = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
   } catch { avatarCache[id] = ''; }

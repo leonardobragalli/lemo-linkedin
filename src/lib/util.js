@@ -1,5 +1,9 @@
 // Utility di testo, date e immagini condivise.
 
+export const BASE = import.meta.env.BASE_URL || '/';
+export const asset = p => BASE + String(p).replace(/^[/]+/, '');
+export const avatar = id => asset(`avatars/${id}.jpg`);
+
 export const TZ = 'Europe/Rome';
 export const GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 export const GIORNI_LUNGHI = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
@@ -111,12 +115,12 @@ export function immaginiMatteo(post) {
   if (!post.immagine) return [];
   const base = post.immagine.replace(/\.png$/, '');
   if (post.slot === '04') {
-    const slides = Array.from({ length: 7 }, (_, i) => ({ nome: `Post04_slide_${i + 1}.jpg`, url: `/img/matteo/04_slide_${i + 1}.jpg` }));
-    return [{ nome: 'Post04_carosello.pdf', url: '/img/matteo/04_scala_carosello.pdf', pdf: true }, ...slides];
+    const slides = Array.from({ length: 7 }, (_, i) => ({ nome: `Post04_slide_${i + 1}.jpg`, url: asset(`img/matteo/04_slide_${i + 1}.jpg`) }));
+    return [{ nome: 'Post04_carosello.pdf', url: asset('img/matteo/04_scala_carosello.pdf'), pdf: true }, ...slides];
   }
   return [
-    { nome: `Post${post.slot}_1_copertina_UHD.jpg`, url: `/img/matteo/${base}_copertina.jpg` },
-    { nome: `Post${post.slot}_2_scheda_UHD.png`, url: `/img/matteo/${base}.png` },
+    { nome: `Post${post.slot}_1_copertina_UHD.jpg`, url: asset(`img/matteo/${base}_copertina.jpg`) },
+    { nome: `Post${post.slot}_2_scheda_UHD.png`, url: asset(`img/matteo/${base}.png`) },
   ];
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
-import { STATI, fmtData, partiRoma, romaToIso, formattaPerLinkedIn, normalizzaTestoPuro, toBold, fromBold, isBold, estraiUrn, dataDaUrn, scaricaUrl } from '../lib/util.js';
+import { avatar, STATI, fmtData, partiRoma, romaToIso, formattaPerLinkedIn, normalizzaTestoPuro, toBold, fromBold, isBold, estraiUrn, dataDaUrn, scaricaUrl } from '../lib/util.js';
 import { immaginiPost } from '../lib/grafica.js';
 import { interazioni } from '../lib/insights.js';
 
@@ -12,13 +12,14 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
   const r0 = partiRoma(post.scheduled_at);
   const [f, setF] = useState(() => ({
     testo: post.testo || '', titolo: post.titolo || '', tema: post.tema || '', fonti: post.fonti || '', commento: post.commento || '',
-    formato: post.formato || 'immagini', is_riserva: !!post.is_riserva, note: post.note || '',
+    formato: post.formato || 'immagini', is_riserva: !!post.is_riserva, note: post.note || '', usa_come_esempio: post.usa_come_esempio !== false,
     data: r0?.ymd || '', ora: r0 ? `${r0.hh}:${r0.mm}` : '',
   }));
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState(null);
   const [imgs, setImgs] = useState(null);
   const [conflitto, setConflitto] = useState(false);
+  const [guida, setGuida] = useState(false);
   const baseUpdated = useRef(post.updated_at);
   const taRef = useRef(null);
 
@@ -54,7 +55,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
   async function salva(extra = {}) {
     const patch = {
       testo: f.testo, titolo: f.titolo, tema: f.tema, fonti: f.fonti, commento: f.commento,
-      formato: f.formato, is_riserva: f.is_riserva, note: f.note,
+      formato: f.formato, is_riserva: f.is_riserva, note: f.note, usa_come_esempio: f.usa_come_esempio,
       scheduled_at: f.data ? romaToIso(f.data, f.ora || '09:00') : null,
       ...extra,
     };
@@ -85,9 +86,11 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
     if (dirty && !(await salva())) return;
     const w = window.open('about:blank', '_blank');
     try { await navigator.clipboard.writeText(testoLi); } catch { /* fallback sotto */ }
-    for (const im of imgs || []) { scaricaUrl(im.url, im.nome); await new Promise(r => setTimeout(r, 250)); }
+    let i = 0;
+    for (const im of (imgs || []).filter(x => !x.pdf || f.formato === 'carosello')) { i++; scaricaUrl(im.url, `${String(i).padStart(2, '0')}_${im.nome}`); await new Promise(r => setTimeout(r, 300)); }
+    setGuida(true);
     if (w) w.location.href = 'https://www.linkedin.com/feed/?shareActive=true'; else window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank');
-    setMsg({ ok: 'Testo copiato e immagini scaricate. Incolla su LinkedIn, allega le immagini, pubblica — poi torna qui e incolla il link del post.' });
+    setMsg({ ok: 'Testo copiato e immagini scaricate (01_, 02_…). Su LinkedIn: incolla, aggiungi le immagini, Pubblica o Pianifica.' });
   }
 
   const [url, setUrl] = useState(post.linkedin_url || '');
@@ -108,7 +111,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget && (!dirty || confirm('Chiudere senza salvare?'))) chiudi(); }}>
       <div className="drawer">
         <div className="dr-head">
-          <img className="av" src={`/avatars/${post.member_id}.jpg`} alt="" />
+          <img className="av" src={avatar(post.member_id)} alt="" />
           <div>
             <b>{member?.nome}</b> <span className="muted">{post.slot ? `· slot #${post.slot}` : post.origine === 'storico' ? '· post precedente al piano' : '· post nuovo'}</span>
             <div className="small muted">Ultima modifica {fmtData(post.updated_at)} {post.updated_by ? `da ${members.find(m => m.id === post.updated_by)?.nome_breve || post.updated_by}` : ''}</div>
@@ -132,6 +135,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
                 <option value="immagini">Immagini</option><option value="carosello">Carosello PDF</option><option value="testo">Solo testo</option><option value="link">Link</option><option value="altro">Altro</option>
               </select></label>
               <label className="chk"><input type="checkbox" checked={f.is_riserva} disabled={!puoModificare} onChange={e => set('is_riserva', e.target.checked)} /> Riserva</label>
+              <label className="chk" title="Se tolto, l'AI non userà questo post come esempio (utile per post personali o fuori tema)"><input type="checkbox" checked={f.usa_come_esempio} disabled={!puoModificare} onChange={e => set('usa_come_esempio', e.target.checked)} /> Esempio per l'AI</label>
             </div>
             <label>Titolo interno <input value={f.titolo} disabled={!puoModificare} onChange={e => set('titolo', e.target.value)} /></label>
             <div className="row tight">
@@ -156,9 +160,21 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
 
           <div className="col-r">
             <div className="preview">
-              <div className="pv-head"><img className="av" src={`/avatars/${post.member_id}.jpg`} alt="" /><div><b>{member?.nome}</b><div className="small muted">{(member?.headline_it || '').slice(0, 80)}…</div></div></div>
+              <div className="pv-head"><img className="av" src={avatar(post.member_id)} alt="" /><div><b>{member?.nome}</b><div className="small muted">{(member?.headline_it || '').slice(0, 80)}…</div></div></div>
               <div className="pv-text">{testoLi}</div>
             </div>
+            {guida && (
+              <div className="card info small">
+                <b>Su LinkedIn (scheda appena aperta):</b>
+                <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  <li>Clicca nel riquadro del post e incolla (Ctrl+V / ⌘V).</li>
+                  <li>Icona immagine → seleziona dai Download i file <b>01_</b>, <b>02_</b>… nell'ordine.</li>
+                  <li>«Pubblica», oppure l'orologio accanto per <b>pianificare</b> all'orario del calendario ({f.data ? `${f.data} ${f.ora}` : 'da decidere'}).</li>
+                </ol>
+                <div className="muted" style={{ marginTop: 6 }}>Con lo script collegato il post viene riconosciuto e segnato come pubblicato da solo; altrimenti incolla il link qui sotto.</div>
+              </div>
+            )}
+            {post.generazione && <Generazione g={post.generazione} />}
             <div className="imgs">
               {imgs === null && <div className="muted small">Genero le immagini…</div>}
               {imgs && imgs.length === 0 && <div className="muted small">Nessuna immagine per questo formato.</div>}
@@ -230,7 +246,7 @@ function Metriche({ post, lista, puo, me, applica, rimuovi }) {
   return (
     <div className="dr-metrics">
       <h3>Dati del post {ore != null && <span className="muted small">· pubblicato da {ore < 48 ? `${ore} ore` : `${Math.round(ore / 24)} giorni`}</span>}</h3>
-      <p className="small muted">Da LinkedIn: apri il post → «Visualizza statistiche». Conviene registrare a 24 ore, 72 ore e 7 giorni.</p>
+      <p className="small muted">Arrivano da soli dallo script «Collega LinkedIn» (al massimo ogni 12 ore, quando l'autore apre LinkedIn).</p>
       {lista.length > 0 && (
         <table className="tbl">
           <thead><tr><th>Rilevato</th>{CAMPI.map(([, l]) => <th key={l}>{l}</th>)}<th>Interaz.</th><th>Fonte</th><th /></tr></thead>
@@ -241,11 +257,36 @@ function Metriche({ post, lista, puo, me, applica, rimuovi }) {
         </table>
       )}
       {puo && (
+        <details style={{ marginTop: 10 }}><summary className="small muted">Inserimento manuale (solo se lo script non è collegato)</summary>
         <form className="mform" onSubmit={aggiungi}>
           {CAMPI.map(([k, l]) => <label key={k}>{l}<input type="number" min="0" value={v[k]} onChange={e => setV({ ...v, [k]: e.target.value })} /></label>)}
           <button className="btn sm">+ Registra dati di oggi</button>
           {err && <span className="errtxt small">{err}</span>}
-        </form>
+        </form></details>
+      )}
+    </div>
+  );
+}
+
+function Generazione({ g }) {
+  const dubbi = (g.claim || []).filter(c => c.stato !== 'fonte citata');
+  return (
+    <div className="card small" style={{ margin: 0 }}>
+      <b>✨ Bozza AI</b> <span className="muted">· {g.modello} · playbook team v{g.playbook?.team ?? '—'} / autore v{g.playbook?.autore ?? '—'}</span>
+      {g.esplorazione && <div className="badge ghost" style={{ marginLeft: 0, marginTop: 6, display: 'inline-block' }}>Esplorazione: prova un'apertura «{g.apertura_provata}» per raccogliere dati</div>}
+      {(g.numeri_da_verificare?.length > 0 || dubbi.length > 0) && (
+        <div className="errtxt" style={{ marginTop: 6 }}>
+          <b>DA VERIFICARE prima di pubblicare:</b>
+          <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+            {(g.numeri_da_verificare || []).map(n => <li key={n}>numero «{n}» non trovato nelle fonti</li>)}
+            {dubbi.map((c, i) => <li key={i}>{c.frase}</li>)}
+          </ul>
+        </div>
+      )}
+      {g.fonti_usate?.length > 0 && (
+        <details style={{ marginTop: 6 }}><summary>Fonti consultate ({g.fonti_usate.length})</summary>
+          <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{g.fonti_usate.map(f => <li key={f.id}>{f.url ? <a href={f.url} target="_blank" rel="noreferrer">{f.titolo}</a> : f.titolo}</li>)}</ul>
+        </details>
       )}
     </div>
   );

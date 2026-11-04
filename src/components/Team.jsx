@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabase.js';
-import { fmtData, oggiYmd } from '../lib/util.js';
+import { fmtData, oggiYmd, avatar } from '../lib/util.js';
 import { bannerProfilo } from '../lib/grafica.js';
 
 export default function Team({ members, memberMetrics, posts, me, applica }) {
@@ -47,7 +47,7 @@ function Membro({ m, storico, posts, me, applica }) {
   return (
     <div className="card member" style={{ borderTopColor: m.colore }}>
       <div className="row tight">
-        <img className="av lg" src={`/avatars/${m.id}.jpg`} alt="" />
+        <img className="av lg" src={avatar(m.id)} alt="" />
         <div><b>{m.nome}</b>{m.is_admin && <span className="badge ghost">admin</span>}<div className="small muted">{m.ruolo}</div></div>
       </div>
       <div className="kpis">

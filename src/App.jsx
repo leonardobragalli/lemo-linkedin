@@ -7,12 +7,17 @@ import Coda from './components/Coda.jsx';
 import Editor from './components/Editor.jsx';
 import Analisi from './components/Analisi.jsx';
 import Team from './components/Team.jsx';
+import Impara from './components/Impara.jsx';
+import Collega from './components/Collega.jsx';
+import { avatar } from './lib/util.js';
 
 const VISTE = [
   { id: 'calendario', label: 'Calendario team' },
   { id: 'coda', label: 'I miei post' },
   { id: 'analisi', label: 'Analisi' },
+  { id: 'impara', label: 'Cosa sta imparando' },
   { id: 'team', label: 'Team & follower' },
+  { id: 'collega', label: 'Collega LinkedIn' },
 ];
 
 export default function App() {
@@ -60,7 +65,7 @@ function Shell({ session }) {
         </nav>
         <div className="who">
           <span className={'dot ' + (data.online ? 'ok' : 'ko')} title={data.online ? 'Aggiornamento in tempo reale attivo' : 'Tempo reale non connesso'} />
-          <img className="av" src={`/avatars/${me.id}.jpg`} alt="" />
+          <img className="av" src={avatar(me.id)} alt="" />
           <span>{me.nome_breve || me.nome}</span>
           <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Esci</button>
         </div>
@@ -70,6 +75,8 @@ function Shell({ session }) {
         {vista === 'coda' && <Coda {...ctx} />}
         {vista === 'analisi' && <Analisi {...ctx} />}
         {vista === 'team' && <Team {...ctx} />}
+        {vista === 'impara' && <Impara {...ctx} />}
+        {vista === 'collega' && <Collega {...ctx} />}
       </main>
       {postAperto && <Editor key={postAperto.id} post={postAperto} {...ctx} chiudi={() => setAperto(null)} />}
     </div>

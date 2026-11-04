@@ -81,6 +81,12 @@ function svgHeadlineWithUnderline(text, x, y, maxChars, lineHeight, maxLines, at
 
 // Ricava 3 celle KPI strutturate e specifiche per ogni slot e per ogni ruolo del team
 function estraiTreKpiCollega(prof, pData, v){
+  // [lemo-linkedin] bozze AI: numeri solo dalle fonti della bozza; nessun numero se non ci sono
+  if (Array.isArray(v.kpi)) {
+    const k = v.kpi.filter(x => x && x.val).slice(0, 3);
+    if (k.length) return k;
+    return [{ tag: 'DISPOSITIVO', val: 'LEMO', desc: 'Dispositivo medico CE' }, { tag: 'TEAM', val: 'Lemons', desc: 'in the Room' }, { tag: 'FIRENZE', val: '🍋', desc: 'Realtà virtuale in ospedale' }];
+  }
   const isEn = (prof.id === 'lazar');
   const pid = pData.id;
   const mVal = v.metrica_val || 'LEMO CE';
@@ -278,7 +284,8 @@ function generaSvgCardCollega(prof, pData, idxSlot, tipo, includeFonts){
 
   if (tipo === 1) {
     // ── 4 ARCHITETTURE EDITORIALI DI COPERTINA AD ALTA AUTOREVOLEZZA (ALLINEATE ALLE NUOVE COPERTINE DI MATTEO) ──
-    const posterMode = (idxSlot * 3 + pIdx * 5) % 4;
+    // [lemo-linkedin] impaginazione scelta dai dati (vis.layout) se presente
+    const posterMode = Number.isInteger(v.layout) ? v.layout % 4 : (idxSlot * 3 + pIdx * 5) % 4;
     const isLight = (posterMode === 1);
     const bgCol1 = isLight ? '#FAF5EF' : st.bg1;
     const bgCol2 = isLight ? '#F2E6D8' : st.bg2;
