@@ -4,6 +4,20 @@
 
 ---
 
+## ⚠️ Stato al 4 novembre 2026 — gran parte della Fase 2 è già fatta
+
+Fatto e testato (non rifarlo, parti da qui):
+- **Sito online**: https://leonardobragalli.github.io/lemo-linkedin/ (GitHub Pages, deploy automatico a ogni push su `main` tramite `.github/workflows/pages.yml`; Vercel non serve).
+- **A1 userscript**: `public/lemo-linkedin.user.js` + Edge Function `ingest-linkedin` + pagina «Collega LinkedIn» (codici personali revocabili `member_tokens`). Parser testato su una pagina statistiche reale; endpoint testato con dati reali. **Non ancora provato dentro un browser vero** (Tampermonkey/Userscripts): è il primo test da fare con Leonardo.
+- **Base di conoscenza**: Edge Function `sync-conoscenza` (cron 02:15 e 02:35), tabella `knowledge_chunks`, ricerca `cerca_conoscenza()`. Lemons Insights: 261 studi caricati. Notion: codice pronto e testato in locale, **manca il secret `NOTION_TOKEN`** (integrazione in sola lettura).
+- **B1/B2 apprendimento**: vista `post_features`, `playbook` versionato ricalcolato ogni notte alle 04:00 (`ricalcola_playbook()`), pagina «Cosa sta imparando», esempi escludibili (`usa_come_esempio`).
+- **B3 generatore**: Edge Function `genera-bozza` + pulsante «Genera bozza con AI». **Manca il secret `GEMINI_API_KEY`**: finché non c'è risponde 503 con messaggio chiaro. Mai testata la generazione vera.
+- **C1**: tavole con impaginazione e numeri presi dalla bozza (`vis.layout`, `vis.kpi`), niente numeri fissi per i post nuovi.
+- **D**: pubblicazione con file numerati 01_, 02_ e guida a lato.
+- `facts`: numeri aziendali da confermare (45 s, 59 strutture, 2 settimane) — l'AI li usa solo dopo conferma di un admin.
+
+Da fare: secrets (Gemini, Notion) → test generazione vera; test userscript in Chrome e Safari; Site URL + SMTP Aruba in Supabase Auth; email dei 7 colleghi; C2 immagini AI (solo se il modello immagini Gemini è gratuito).
+
 ## Ruolo e regole di lavoro
 
 Lavori per **Leonardo Bragalli**, BizOps Engineer di Lemons in the Room (LEMO), startup fiorentina che porta la realtà virtuale immersiva negli ospedali con **LEMO, dispositivo medico marcato CE in Classe I** (destinazione d'uso: comfort e benessere emotivo durante ricoveri e procedure).
