@@ -1,3 +1,11 @@
+# Regole di lingua per tutte le bozze della Regia LinkedIn
+
+- Italiano corretto con **tutti gli accenti e gli apostrofi**: è, perché, più, già, realtà, continuità, sanità, qualità, l'altro. Mai "e" al posto di "è", mai "perche", mai "realta".
+- Lazar scrive in inglese; tutti gli altri in italiano.
+- Niente markdown (asterischi, cancelletti per titoli): LinkedIn mostra il testo così com'è.
+
+---
+
 # voice.md
 
 Voice profile of Dr Matteo Era. Every li-* skill reads this file before writing.
