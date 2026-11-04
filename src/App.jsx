@@ -35,7 +35,7 @@ export default function App() {
 
 function Shell({ session }) {
   const data = useTeamData(session);
-  const [vista, setVista] = useState(() => location.hash.replace('#', '') || 'calendario');
+  const [vista, setVista] = useState(() => { const h = location.hash.replace('#', ''); return VISTE.some(v => v.id === h) ? h : 'calendario'; });
   const [aperto, setAperto] = useState(null); // id post
   const email = session.user.email.toLowerCase();
   const me = useMemo(() => data.members.find(m => (m.email || '').toLowerCase() === email), [data.members, email]);

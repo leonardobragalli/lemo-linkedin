@@ -5,7 +5,7 @@ export const supabaseUrl = 'https://qpufcekagamvpubosisj.supabase.co';
 export const supabaseKey = 'sb_publishable_TA2hknW3eVbQZDKbueiruQ_wfnDkirV';
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },   // il link funziona anche se aperto da un altro browser/dispositivo
 });
 
 export const DOMINIO = '@lemonsintheroom.com';
