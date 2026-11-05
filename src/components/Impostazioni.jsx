@@ -156,7 +156,7 @@ function Numeri({ me }) {
   async function aggiungi(e) {
     e.preventDefault();
     const chiave = 'man_' + nuovo.etichetta.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').slice(0, 50) + '_' + Date.now().toString(36);
-    const conf = nuovo.fonte.trim() ? { confermato_da: me.id, confermato_il: new Date().toISOString() } : {};
+    const conf = nuovo.fonte.trim() ? { confermato_da: me.id, confermato_il: new Date().toISOString(), stato: 'confermato' } : { stato: 'da_verificare' };
     const { error } = await supabase.from('facts').insert({ chiave, etichetta: nuovo.etichetta.trim(), valore: nuovo.valore.trim(), fonte: nuovo.fonte.trim() || null, automatico: false, ...conf });
     if (error) { alert(error.message); return; }
     setNuovo(null); carica();
@@ -170,7 +170,8 @@ function Numeri({ me }) {
     <div className="card" style={{ marginBottom: 16 }}>
       <h3>Numeri aziendali</h3>
       <p className="small muted">
-        L'AI usa nelle bozze <b>solo</b> i numeri con la spunta verde. Li gestisci tu: aggiungili, modificali quando cambiano, togli la conferma se non sono più validi.
+        Ogni numero ha uno stato: <b>✅ confermato</b> (l'AI lo usa), <b>🟡 provvisorio</b> (l'AI lo usa ma la bozza ti avvisa di controllarlo), <b>🔴 da verificare</b> (l'AI non lo usa).
+        Quando cambi un valore, le bozze nuove usano subito quello nuovo; i post già scritti che lo usavano mostrano «numero cambiato».
       </p>
       <table className="tbl"><thead><tr><th>Dato</th><th>Valore</th><th>Fonte</th><th>Stato</th><th /></tr></thead><tbody>
         {facts.map(f => <RigaNumero key={f.id} f={f} me={me} salva={salva} elimina={elimina} />)}
@@ -194,7 +195,8 @@ function RigaNumero({ f, me, salva, elimina }) {
   const [fo, setFo] = useState(f.fonte || '');
   const [et, setEt] = useState(f.etichetta || '');
   useEffect(() => { setV(f.valore || ''); setFo(f.fonte || ''); setEt(f.etichetta || ''); }, [f.valore, f.fonte, f.etichetta]);
-  const ok = !!f.confermato_il;
+  const stato = f.stato || (f.confermato_il ? 'confermato' : 'da_verificare');
+  const ok = stato === 'confermato';
 
   if (f.automatico) return (
     <tr><td>{f.etichetta}</td><td><b>{f.valore}</b></td><td className="small muted">{f.fonte}</td>
@@ -206,7 +208,8 @@ function RigaNumero({ f, me, salva, elimina }) {
       <td><input value={v} onChange={e => setV(e.target.value)} /></td>
       <td><input value={fo} onChange={e => setFo(e.target.value)} placeholder="Fonte obbligatoria per confermare" /></td>
       <td colSpan={2} style={{ whiteSpace: 'nowrap' }}>
-        <button className="btn sm" disabled={!v.trim() || !fo.trim()} onClick={() => { salva(f, { etichetta: et.trim(), valore: v.trim(), fonte: fo.trim(), confermato_da: me.id, confermato_il: new Date().toISOString(), note: null }); setEd(false); }}>Salva e conferma</button>
+        <button className="btn sm" disabled={!v.trim() || !fo.trim()} onClick={() => { salva(f, { etichetta: et.trim(), valore: v.trim(), fonte: fo.trim(), confermato_da: me.id, confermato_il: new Date().toISOString(), note: null, stato: 'confermato' }); setEd(false); }}>Salva e conferma</button>
+        <button className="btn ghost sm" disabled={!v.trim()} onClick={() => { salva(f, { etichetta: et.trim(), valore: v.trim(), fonte: fo.trim() || null, stato: f.stato === 'confermato' ? 'provvisorio' : (f.stato || 'da_verificare'), confermato_il: null, confermato_da: null }); setEd(false); }}>Salva senza confermare</button>
         <button className="btn ghost sm" onClick={() => setEd(false)}>Annulla</button>
       </td>
     </tr>
@@ -214,10 +217,15 @@ function RigaNumero({ f, me, salva, elimina }) {
   return (
     <tr>
       <td>{f.etichetta}</td><td><b>{f.valore}</b></td><td className="small">{f.fonte || '—'}</td>
-      <td className="small">{ok ? <span style={{ color: '#047857' }}>✓ confermato · {fmtData(f.confermato_il)}</span> : <span className="errtxt">{f.note || 'DA VERIFICARE'} (l'AI non lo usa)</span>}</td>
+      <td className="small">
+        <select value={stato} onChange={e => salva(f, e.target.value === 'confermato' ? { stato: 'confermato', confermato_da: me.id, confermato_il: new Date().toISOString() } : { stato: e.target.value, confermato_il: null, confermato_da: null })}>
+          <option value="confermato">✅ confermato</option><option value="provvisorio">🟡 provvisorio</option><option value="da_verificare">🔴 da verificare</option>
+        </select>
+        {ok && f.confermato_il && <div className="muted">{fmtData(f.confermato_il)}</div>}
+        {f.note && <div className="muted">{f.note}</div>}
+      </td>
       <td style={{ whiteSpace: 'nowrap' }}>
-        <button className="btn ghost xs" onClick={() => setEd(true)}>{ok ? 'Modifica' : 'Conferma / modifica'}</button>
-        {ok && <button className="btn ghost xs" onClick={() => salva(f, { confermato_il: null, confermato_da: null })}>Togli conferma</button>}
+        <button className="btn ghost xs" onClick={() => setEd(true)}>Modifica</button>
         <button className="btn ghost xs danger" onClick={() => elimina(f)}>Elimina</button>
       </td>
     </tr>

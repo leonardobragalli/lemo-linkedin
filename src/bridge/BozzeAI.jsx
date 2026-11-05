@@ -18,6 +18,8 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
   const [gen, setGen] = useState({ tema: '', istruzioni: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [facts, setFacts] = useState({});
+  useEffect(() => { supabase.from('facts').select('chiave,etichetta,valore').then(({ data }) => setFacts(Object.fromEntries((data || []).map(f => [f.chiave, f])))); }, []);
 
   // segue il profilo scelto nel Pannello quando si entra nella scheda
   useEffect(() => {
@@ -33,18 +35,19 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
   const bozze = useMemo(() => posts.filter(p => p.member_id === chi && p.testo_generato && p.stato !== 'scartato')
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)), [posts, chi]);
 
-  async function genera() {
+  async function genera(rifai) {
+    const corpo = rifai || { member_id: chi, tema: gen.tema, istruzioni: gen.istruzioni };
     setBusy(true); setErr(null);
     const { data: s } = await supabase.auth.getSession();
     const r = await fetch(`${supabaseUrl}/functions/v1/genera-bozza`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + s.session.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: chi, tema: gen.tema, istruzioni: gen.istruzioni }),
+      body: JSON.stringify(corpo),
     });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) { setErr(j.error || `Errore ${r.status}`); return; }
     applica('posts', j.post);
-    setGen({ tema: '', istruzioni: '' });
+    if (!rifai) setGen({ tema: '', istruzioni: '' });
   }
 
   const nome = members.find(m => m.id === chi)?.nome || chi;
@@ -59,27 +62,27 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
 
       <div className="card">
         <h3>Nuova bozza per {nome}</h3>
-        <p className="small muted">Gemini scrive nella voce dell'autore usando le regole imparate dai dati, i post che hanno reso di più e gli studi di Lemons Insights.
-          Ogni numero o affermazione senza fonte viene segnato <b>DA VERIFICARE</b>. Poi la metti in uno slot del calendario e la rifinisci lì come qualsiasi altro post.</p>
+        <p className="small muted">Gemini scrive partendo dalla scheda dell'autore (ruolo, lingua, temi, voce), dagli studi di Lemons Insights e PubMed e dai numeri aziendali confermati o provvisori.
+          Controlla da solo lunghezza, prima riga, frasi già usate dal team e claim vietati; ogni numero senza fonte o provvisorio viene segnato <b>DA VERIFICARE</b>. Poi la metti in uno slot del calendario e la rifinisci lì.</p>
         {puo ? (
           <>
             <label>Tema (facoltativo) <input value={gen.tema} onChange={e => setGen({ ...gen, tema: e.target.value })} placeholder="es. ansia prima dei prelievi in pediatria" /></label>
             <label>Istruzioni (facoltative) <textarea rows={2} value={gen.istruzioni} onChange={e => setGen({ ...gen, istruzioni: e.target.value })} placeholder="es. racconta la consegna di ieri al Meyer, tono pratico" /></label>
             <div className="row tight" style={{ marginTop: 8 }}>
-              <button className="btn orange" disabled={busy} onClick={genera}>{busy ? 'Scrivo… (10-30 s)' : '✨ Genera bozza'}</button>
+              <button className="btn orange" disabled={busy} onClick={() => genera()}>{busy ? 'Scrivo… (10-30 s)' : '✨ Genera bozza'}</button>
               {err && <span className="errtxt small">{err}</span>}
             </div>
           </>
         ) : <p className="small errtxt">Puoi generare bozze solo per il tuo profilo.</p>}
       </div>
 
-      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} />)}
+      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} facts={facts} rigenera={() => genera({ member_id: p.member_id, tema: p.tema || '' })} busy={busy} />)}
       {!bozze.length && <p className="muted">Nessuna bozza AI per {nome}.</p>}
     </div>
   );
 }
 
-function Bozza({ post, chi, puo, apri }) {
+function Bozza({ post, chi, puo, apri, facts, rigenera, busy }) {
   const [gancio, setGancio] = useState(0);
   const [slot, setSlot] = useState('');
   const [msg, setMsg] = useState(null);
@@ -111,6 +114,13 @@ function Bozza({ post, chi, puo, apri }) {
       )}
       <pre className="lemo-testo">{testo}</pre>
       {post.note && <p className="small errtxt">{post.note}</p>}
+      {(() => {
+        const cambiati = Object.entries(post.generazione?.numeri_valori || {}).filter(([k, v]) => facts[k] && facts[k].valore !== v);
+        return cambiati.length > 0 && (
+          <p className="small errtxt">⚠ Numero cambiato: {cambiati.map(([k, v]) => `${facts[k].etichetta} era «${v}», ora «${facts[k].valore}»`).join('; ')}
+            {puo && <> · <button className="btn xs" disabled={busy} onClick={rigenera}>Rigenera</button></>}</p>
+        );
+      })()}
       {post.fonti && <p className="small muted">Fonti: {String(post.fonti).slice(0, 400)}</p>}
       <div className="row tight" style={{ marginTop: 8 }}>
         <button className="btn ghost sm" onClick={copia}>Copia testo</button>
