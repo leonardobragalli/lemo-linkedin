@@ -7,3 +7,8 @@ dist
 
 script-mac/.env
 script-mac/*.log
+
+
+# Pannello di Matteo: dati non pubblici
+pannello/
+privato/
