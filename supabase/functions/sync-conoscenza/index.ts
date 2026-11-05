@@ -13,13 +13,20 @@ async function sha(s: string) {
 
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  // solo membri del team con sessione valida (la chiave pubblica da sola non basta)
+  const auth = req.headers.get('authorization') || '';
+  const utente = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
+  const { data: isTeam } = await utente.rpc('is_team');
+  if (isTeam !== true) return json({ error: 'Accesso riservato al team' }, 403);
+
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   let body: any = {};
   try { body = await req.json(); } catch { /* vuoto */ }
 
-  // anti-abuso: al massimo un giro ogni 3 minuti
+  // anti-abuso: un giro ogni 3 minuti; con "forza" comunque non prima di 30 secondi
   const { data: ultimo } = await db.from('sync_log').select('created_at').eq('job', 'conoscenza').order('created_at', { ascending: false }).limit(1);
-  if (!body.forza && ultimo?.[0] && Date.now() - new Date(ultimo[0].created_at).getTime() < 3 * 60e3) return json({ ok: true, saltato: 'eseguito meno di 3 minuti fa' });
+  const attesa = body.forza ? 30e3 : 3 * 60e3;
+  if (ultimo?.[0] && Date.now() - new Date(ultimo[0].created_at).getTime() < attesa) return json({ ok: true, saltato: 'eseguito poco fa' });
 
   const report: Record<string, unknown> = {};
   const errori: string[] = [];

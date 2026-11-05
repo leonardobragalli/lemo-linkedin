@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
-import { avatar, STATI, fmtData, partiRoma, romaToIso, formattaPerLinkedIn, normalizzaTestoPuro, toBold, fromBold, isBold, estraiUrn, dataDaUrn, scaricaUrl } from '../lib/util.js';
+import { avatar, STATI, fmtData, partiRoma, romaToIso, formattaPerLinkedIn, normalizzaTestoPuro, toBold, fromBold, isBold, estraiUrn, dataDaUrn, scaricaUrl, corpoDopoApertura } from '../lib/util.js';
 import { immaginiPost } from '../lib/grafica.js';
 import { interazioni } from '../lib/insights.js';
 
@@ -79,7 +79,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
   function cambiaGancio(i) {
     const g = (post.ganci_opzioni || [])[i]; if (!g?.uni) return;
     const righe = normalizzaTestoPuro(f.testo).split('\n');
-    set('testo', g.uni + '\n' + righe.slice(2).join('\n'));
+    set('testo', g.uni.replace(/\n+$/, '') + '\n' + corpoDopoApertura(righe).join('\n'));
   }
 
   async function pubblicaAssistito() {

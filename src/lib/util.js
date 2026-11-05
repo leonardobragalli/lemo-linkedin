@@ -25,10 +25,16 @@ export function formattaPerLinkedIn(t) {
   return puro.split('\n').map(r => (r.trim() === '' ? '\u2800' : r)).join('\n');
 }
 
-// Grassetto Unicode (LinkedIn non supporta il markdown)
+// L'apertura è il blocco iniziale fino alla prima riga vuota (di solito 2 righe): restituisce il resto, riga vuota compresa
+export function corpoDopoApertura(righe) {
+  const b = righe.findIndex((r, i) => i > 0 && r.trim() === '');
+  return b > 0 ? righe.slice(b) : ['', ...righe.slice(2)];
+}
+
+// Grassetto Unicode (LinkedIn non supporta il markdown). Lettere accentate: base in grassetto + accento combinante
 const BOLD_UP = 0x1d5d4, BOLD_LO = 0x1d5ee, BOLD_DG = 0x1d7ec;
 export function toBold(s) {
-  return [...s].map(ch => {
+  return [...String(s || '').normalize('NFD')].map(ch => {
     const c = ch.codePointAt(0);
     if (c >= 65 && c <= 90) return String.fromCodePoint(BOLD_UP + c - 65);
     if (c >= 97 && c <= 122) return String.fromCodePoint(BOLD_LO + c - 97);
@@ -37,7 +43,7 @@ export function toBold(s) {
   }).join('');
 }
 export function fromBold(s) {
-  return [...s].map(ch => {
+  return [...String(s || '')].map(ch => {
     const c = ch.codePointAt(0);
     if (c >= BOLD_UP && c < BOLD_UP + 26) return String.fromCharCode(65 + c - BOLD_UP);
     if (c >= BOLD_LO && c < BOLD_LO + 26) return String.fromCharCode(97 + c - BOLD_LO);
@@ -46,9 +52,9 @@ export function fromBold(s) {
     if (c >= 0x1d608 && c < 0x1d608 + 26) return String.fromCharCode(65 + c - 0x1d608);
     if (c >= 0x1d622 && c < 0x1d622 + 26) return String.fromCharCode(97 + c - 0x1d622);
     return ch;
-  }).join('');
+  }).join('').normalize('NFC');
 }
-export const isBold = s => [...s].some(ch => { const c = ch.codePointAt(0); return c >= BOLD_UP && c < BOLD_DG + 10; });
+export const isBold = s => [...String(s || '')].some(ch => { const c = ch.codePointAt(0); return c >= BOLD_UP && c < BOLD_DG + 10; });
 
 export function primaRiga(t) {
   return fromBold(normalizzaTestoPuro(t).split('\n')[0] || '');

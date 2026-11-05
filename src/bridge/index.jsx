@@ -21,7 +21,6 @@ async function sessione() {
 }
 
 async function avvia() {
-  // nascondi il Pannello finché non è pronto
   document.documentElement.classList.add('lemo-attesa');
   schermo('<div class="center muted">Caricamento…</div>');
   let s = await sessione();
@@ -31,29 +30,27 @@ async function avvia() {
     supabase.auth.onAuthStateChange((_e, nuova) => { if (nuova) location.reload(); });
     return;
   }
-  const email = s.user.email.toLowerCase();
+  const email = (s.user.email || '').toLowerCase();
   const { data: me } = await supabase.from('team_members').select('*').ilike('email', email).maybeSingle();
   if (!me) {
     schermo(`<div class="center col"><p>L'email ${email} non è nel team.</p><button class="btn" id="lemo-esci">Esci</button></div>`);
     document.getElementById('lemo-esci').onclick = () => supabase.auth.signOut().then(() => location.reload());
     return;
   }
-  // pagina leggera pubblica: scarica il Pannello dallo spazio privato e lo apre
+  // Pagina leggera pubblica: scarica il Pannello dallo spazio privato e lo apre
   if (!document.getElementById('lemo-main')) { await apriPannello(s); return; }
 
   try {
     await caricaStatoIniziale(me.id);
   } catch (e) {
-    schermo(`<div class="center col"><p>Non riesco a caricare i dati del team: ${String(e.message || e)}</p><button class="btn" onclick="location.reload()">Riprova</button></div>`);
+    schermo(`<div class="center col"><p>Non riesco a caricare i dati del team: ${String(e.message || e)}</p><button class="btn" id="lemo-retry">Riprova</button></div>`);
+    const btn = document.getElementById('lemo-retry');
+    if (btn) btn.onclick = () => location.reload();
     return;
   }
-  // primo accesso: il Pannello si apre sul proprio profilo
   try { if (!localStorage.getItem('lemons-active-prof')) localStorage.setItem('lemons-active-prof', me.id); } catch { /* niente */ }
 
-  // avvia il codice originale del Pannello + integrazione
   const main = document.getElementById('lemo-main').textContent;
-  // I dati arrivano già aggiornati dal server: evita che il Pannello, al primo avvio in un browser nuovo,
-  // cancelli i testi modificati considerandoli dati locali vecchi (iniettaTelemetriaIniziale → forceReset).
   const ver = main.match(/const TELEMETRY_SCHEMA_VER = '([^']+)'/)?.[1];
   if (ver) { try { localStorage.setItem('lemons-telemetry-ver', ver); } catch { /* niente */ } }
   const sc = document.createElement('script');
@@ -64,27 +61,36 @@ async function avvia() {
   document.documentElement.classList.remove('lemo-attesa');
   if (!me.is_admin) document.querySelectorAll('[data-tab="impostazioni"]').forEach(b => b.remove());
 
-  // account in alto + avvisi
   const top = document.querySelector('.topbar');
-  if (top) {
+  if (top && !top.querySelector('.lemo-account')) {
     const box = document.createElement('div');
     box.className = 'lemo-x lemo-account';
-    box.innerHTML = `<span class="lemo-live" title="Aggiornamento in tempo reale"></span><span class="lemo-chi">${me.nome_breve || me.nome}</span><button class="lemo-esci" type="button">Esci</button>`;
+    box.innerHTML = `<span class="lemo-live" title="Aggiornamento in tempo reale"></span><span class="lemo-chi"></span><button class="lemo-esci" type="button">Esci</button>`;
+    box.querySelector('.lemo-chi').textContent = me.nome_breve || me.nome;
     box.querySelector('.lemo-esci').onclick = () => supabase.auth.signOut().then(() => location.reload());
     top.appendChild(box);
   }
-  const av = document.createElement('div');
-  av.id = 'lemo-avviso'; av.className = 'lemo-x lemo-avviso'; av.hidden = true;
-  document.body.appendChild(av);
+  if (!document.getElementById('lemo-avviso')) {
+    const av = document.createElement('div');
+    av.id = 'lemo-avviso'; av.className = 'lemo-x lemo-avviso'; av.hidden = true;
+    document.body.appendChild(av);
+  }
 
-  // schede aggiuntive (React) dentro i pannelli del Pannello
   const host = document.createElement('div');
   host.className = 'lemo-x';
   document.body.appendChild(host);
   createRoot(host).render(<Extra session={s} />);
 }
 
-// Il Pannello sta in uno spazio privato (solo team, dopo il login). Copia locale per versione (eTag).
+async function decodificaPannelloBlob(blob) {
+  const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  const isGzip = head.length === 2 && head[0] === 0x1f && head[1] === 0x8b;
+  if (isGzip && typeof DecompressionStream !== 'undefined') {
+    return new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  }
+  return blob.text();
+}
+
 async function apriPannello(s) {
   const FILE = 'pannello.html.gz';
   const el = schermo('<div class="center col"><div class="big">🍋</div><p class="muted" id="lemo-prog">Apro il Pannello…</p></div>');
@@ -115,14 +121,17 @@ async function apriPannello(s) {
         try {
           for (const k of await cache.keys()) await cache.delete(k);
           await cache.put(chiave, new Response(blob));
-        } catch { /* spazio pieno: pazienza */ }
+        } catch { /* spazio pieno */ }
       }
     }
     prog('Apro il Pannello…');
-    const html = await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    const html = await decodificaPannelloBlob(blob);
+    try { supabase.removeAllChannels(); } catch { /* niente */ }
     document.open(); document.write(html); document.close();
   } catch (e) {
-    schermo(`<div class="center col"><p>Non riesco ad aprire il Pannello: ${String(e.message || e)}</p><button class="btn" onclick="location.reload()">Riprova</button></div>`);
+    schermo(`<div class="center col"><p>Non riesco ad aprire il Pannello: ${String(e.message || e)}</p><button class="btn" id="lemo-retry-dl">Riprova</button></div>`);
+    const btn = document.getElementById('lemo-retry-dl');
+    if (btn) btn.onclick = () => location.reload();
   }
 }
 

@@ -2,7 +2,7 @@
 // e la mette in uno slot del calendario del Pannello, oppure la apre nell'editor completo.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseUrl } from '../supabase.js';
-import { normalizzaTestoPuro, primaRiga, fmtData } from '../lib/util.js';
+import { normalizzaTestoPuro, primaRiga, fmtData, corpoDopoApertura } from '../lib/util.js';
 
 const P = () => window.__lemoPannello;
 
@@ -10,7 +10,7 @@ function conGancio(post, i) {
   const g = (post.ganci_opzioni || [])[i];
   if (!g?.uni) return post.testo || '';
   const righe = normalizzaTestoPuro(post.testo || '').split('\n');
-  return g.uni + '\n' + righe.slice(2).join('\n');
+  return g.uni.replace(/\n+$/, '') + '\n' + corpoDopoApertura(righe).join('\n');
 }
 
 export default function BozzeAI({ members, posts, me, apri, applica }) {
