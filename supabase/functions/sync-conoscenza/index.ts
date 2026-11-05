@@ -1,7 +1,7 @@
-// Aggiorna la base di conoscenza: Lemons Insights + fonti Notion (tabella fonti_notion).
-// Invocata dal cron notturno o dal pulsante "Aggiorna ora".
+// Pulsante «Aggiorna Insights ora»: rilegge solo Lemons Insights.
+// Notion (e Insights ogni giorno) li aggiorna lo script sul Mac: script-mac/aggiorna_conoscenza.py.
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { leggiInsights, leggiNotion } from '../_shared/fonti.ts';
+import { leggiInsights } from '../_shared/fonti.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -17,7 +17,7 @@ Deno.serve(async req => {
   let body: any = {};
   try { body = await req.json(); } catch { /* vuoto */ }
 
-  // anti-abuso: al massimo un giro ogni 3 minuti (le pagine Notion si leggono a lotti)
+  // anti-abuso: al massimo un giro ogni 3 minuti
   const { data: ultimo } = await db.from('sync_log').select('created_at').eq('job', 'conoscenza').order('created_at', { ascending: false }).limit(1);
   if (!body.forza && ultimo?.[0] && Date.now() - new Date(ultimo[0].created_at).getTime() < 3 * 60e3) return json({ ok: true, saltato: 'eseguito meno di 3 minuti fa' });
 
@@ -48,28 +48,7 @@ Deno.serve(async req => {
     }
   } catch (e) { errori.push('Insights: ' + e); }
 
-  // 2. Notion (fonti attive in tabella)
-  let token = Deno.env.get('NOTION_TOKEN') || '';
-  if (!token) { const { data } = await db.rpc('leggi_segreto', { nome: 'NOTION_TOKEN' }); token = data || ''; }
-  if (!token) report.notion = 'Chiave Notion non configurata: saltato';
-  else {
-    try {
-      const { data: fonti } = await db.from('fonti_notion').select('*').eq('attivo', true).order('ordine');
-      const { data: noti } = await db.from('knowledge_chunks').select('source_id,meta').eq('fonte', 'notion');
-      const visti: Record<string, string> = {};
-      for (const n of noti || []) if ((n.meta as any)?.last_edited) visti[n.source_id] = (n.meta as any).last_edited;
-      const r = await leggiNotion(token, fonti || [], visti, 70);
-      errori.push(...r.errori);
-      report.notion = await salva(r.chunks.map(({ last_edited, ...c }) => ({ ...c, meta: { ...c.meta, last_edited } })));
-      report.notion_completo = r.completo;
-      if (r.errori.length === 0) {   // pagine sparite o fonti disattivate → via dalla base
-        const pres = new Set(r.presenti);
-        const via = (noti || []).filter(n => !pres.has(n.source_id)).map(n => n.source_id);
-        for (let i = 0; i < via.length; i += 100) await db.from('knowledge_chunks').delete().eq('fonte', 'notion').in('source_id', via.slice(i, i + 100));
-        report.notion_rimossi = via.length;
-      }
-    } catch (e) { errori.push('Notion: ' + e); }
-  }
+  // Notion: lo aggiorna lo script giornaliero sul Mac (script-mac/aggiorna_conoscenza.py), non il server.
 
   const ok = errori.length === 0;
   await db.from('sync_log').insert({ job: 'conoscenza', ok, dettagli: { ...report, errori } });

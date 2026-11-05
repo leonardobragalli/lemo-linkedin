@@ -170,7 +170,7 @@ function Numeri({ me }) {
     <div className="card" style={{ marginBottom: 16 }}>
       <h3>Numeri aziendali</h3>
       <p className="small muted">
-        L'AI usa nelle bozze <b>solo</b> i numeri con la spunta verde. Li gestisci tu: modificali quando cambiano, togli la conferma se non sono più validi.
+        L'AI usa nelle bozze <b>solo</b> i numeri con la spunta verde. Li gestisci tu: aggiungili, modificali quando cambiano, togli la conferma se non sono più validi.
       </p>
       <table className="tbl"><thead><tr><th>Dato</th><th>Valore</th><th>Fonte</th><th>Stato</th><th /></tr></thead><tbody>
         {facts.map(f => <RigaNumero key={f.id} f={f} me={me} salva={salva} elimina={elimina} />)}
@@ -227,22 +227,19 @@ function RigaNumero({ f, me, salva, elimina }) {
 // ───────────────────────── Fonti (Notion + Insights) ─────────────────────────
 function Fonti() {
   const [fonti, setFonti] = useState([]);
-  const [chiavi, setChiavi] = useState([]);
   const [kb, setKb] = useState({});
   const [log, setLog] = useState([]);
   const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState(null);
-  const [token, setToken] = useState('');
   const [nuova, setNuova] = useState(null);
 
   async function carica() {
-    const [f, c, l, k] = await Promise.all([
+    const [f, l, k] = await Promise.all([
       supabase.from('fonti_notion').select('*').order('ordine'),
-      supabase.rpc('stato_chiavi'),
-      supabase.from('sync_log').select('*').eq('job', 'conoscenza').order('created_at', { ascending: false }).limit(6),
+            supabase.from('sync_log').select('*').eq('job', 'conoscenza').order('created_at', { ascending: false }).limit(6),
       supabase.from('knowledge_chunks').select('fonte,area').limit(5000),
     ]);
-    setFonti(f.data || []); setChiavi(c.data || []); setLog(l.data || []);
+    setFonti(f.data || []); setLog(l.data || []);
     const per = {}; for (const r of k.data || []) { const n = r.fonte === 'notion' ? r.area : 'Lemons Insights'; per[n] = (per[n] || 0) + 1; }
     setKb(per);
   }
@@ -252,14 +249,8 @@ function Fonti() {
     setBusy('sync'); setMsg(null);
     try {
       const d = await chiamaFunzione('sync-conoscenza', { forza: true });
-      setMsg(d.saltato ? { t: d.saltato } : { ok: d.ok, t: d.ok ? `Aggiornato ✓ · Insights ${d.insights ?? 0} · Notion ${typeof d.notion === 'number' ? d.notion + ' pagine nuove o cambiate' : d.notion}${d.notion_completo === false ? ' (continua al prossimo giro)' : ''}` : 'Completato con errori: ' + (d.errori || []).join(' · ').slice(0, 300) });
+      setMsg(d.saltato ? { t: d.saltato } : { ok: d.ok, t: d.ok ? `Insights aggiornato ✓ · ${d.insights ?? 0} studi` : 'Completato con errori: ' + (d.errori || []).join(' · ').slice(0, 300) });
     } catch (e) { setMsg({ t: e.message }); }
-    await carica(); setBusy(null);
-  }
-  async function salvaToken(e) {
-    e.preventDefault(); setBusy('token'); setMsg(null);
-    try { await chiamaFunzione('imposta-chiave', { nome: 'NOTION_TOKEN', valore: token }); setToken(''); setMsg({ ok: true, t: 'Chiave Notion salvata ✓ (cifrata). Ora premi «Aggiorna ora».' }); }
-    catch (e2) { setMsg({ t: e2.message }); }
     await carica(); setBusy(null);
   }
   async function patch(f, campi) {
@@ -280,17 +271,16 @@ function Fonti() {
     await supabase.from('fonti_notion').delete().eq('id', f.id); carica();
   }
 
-  const ck = chiavi.find(c => c.nome === 'NOTION_TOKEN');
   const ultimo = log[0];
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <h3>Base di conoscenza: Notion e Lemons Insights</h3>
-      <p className="small muted">Ogni notte (2:15 e 2:35) la piattaforma rilegge Lemons Insights e i database Notion qui sotto, aggiunge le pagine nuove, aggiorna quelle cambiate e toglie quelle cancellate. Con «Aggiorna ora» lo fai subito.
+      <p className="small muted">Una volta al giorno lo <b>script sul Mac</b> rilegge Lemons Insights e i database Notion attivi qui sotto: aggiunge le pagine nuove, aggiorna quelle cambiate e toglie quelle cancellate. «Aggiorna Insights ora» rilegge subito solo gli studi di Lemons Insights.
         Entra <b>solo</b> quello che è pubblicabile: niente CRM, contratti, gare o dati di pazienti.</p>
 
       <div className="row tight" style={{ margin: '8px 0' }}>
-        <button className="btn" onClick={aggiorna} disabled={!!busy}>{busy === 'sync' ? 'Aggiorno… (fino a 1 minuto)' : 'Aggiorna ora'}</button>
+        <button className="btn" onClick={aggiorna} disabled={!!busy}>{busy === 'sync' ? 'Aggiorno…' : 'Aggiorna Insights ora'}</button>
         <span className="small muted">{ultimo ? `Ultimo aggiornamento: ${fmtData(ultimo.created_at)} ${ultimo.ok ? '✓' : '· con errori'}` : 'Mai aggiornato'}</span>
       </div>
       {msg && <div className={'small ' + (msg.ok ? '' : 'errtxt')} style={{ marginBottom: 8 }}>{msg.t}</div>}
@@ -315,17 +305,10 @@ function Fonti() {
           <label className="small"><input type="checkbox" checked={nuova.corpo} onChange={e => setNuova({ ...nuova, corpo: e.target.checked })} /> leggi anche il testo</label>
           <button className="btn sm">Aggiungi</button>
           <button type="button" className="btn ghost sm" onClick={() => setNuova(null)}>Annulla</button>
-          <div className="small muted" style={{ width: '100%' }}>Il database deve essere condiviso con l'integrazione Notion della piattaforma (in Notion: ••• → Connessioni).</div>
+          <div className="small muted" style={{ width: '100%' }}>Il database deve essere condiviso con l'integrazione Notion usata dallo script sul Mac (in Notion: ••• → Connessioni). Entra al prossimo giro dello script.</div>
         </form>
       ) : <button className="btn ghost sm" style={{ marginTop: 10 }} onClick={() => setNuova({ link: '', nome: '', corpo: false })}>+ Aggiungi database Notion</button>}
 
-      <h3 style={{ marginTop: 18 }}>Chiave Notion</h3>
-      <p className="small">{ck ? <span style={{ color: '#047857' }}>✓ Configurata · aggiornata {fmtData(ck.aggiornata)}</span> : <span className="errtxt">Non configurata: Notion non viene letto.</span>}</p>
-      <form className="row tight" onSubmit={salvaToken}>
-        <input type="password" autoComplete="off" placeholder={ck ? 'Incolla una nuova chiave per sostituirla' : 'Incolla la chiave dell\'integrazione (ntn_…)'} value={token} onChange={e => setToken(e.target.value)} style={{ minWidth: 340 }} />
-        <button className="btn sm" disabled={!token.trim() || !!busy}>{busy === 'token' ? 'Verifico…' : 'Salva chiave'}</button>
-      </form>
-      <p className="small muted">La chiave viene provata su Notion, poi salvata cifrata: nessuno la può rileggere dal sito.</p>
     </div>
   );
 }

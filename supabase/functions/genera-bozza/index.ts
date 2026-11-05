@@ -149,7 +149,7 @@ Deno.serve(async req => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `Sei il ghostwriter LinkedIn del team di Lemons in the Room. Scrivi bozze nella voce dell'autore indicato.\n\n${VINCOLI}\n\nDOCUMENTO DI TONO E REGOLE SULLE EVIDENZE (scritto per Matteo Era: le regole su evidenze e "Off limits" valgono per tutti; la voce personale adattala all'autore):\n${VOICE}` }] },
+      systemInstruction: { parts: [{ text: `Sei il ghostwriter LinkedIn del team di Lemons in the room. Scrivi bozze nella voce dell'autore indicato.\n\n${VINCOLI}\n\nDOCUMENTO DI TONO E REGOLE SULLE EVIDENZE (scritto per Matteo Era: le regole su evidenze e "Off limits" valgono per tutti; la voce personale adattala all'autore):\n${VOICE}` }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.85 },
     }),

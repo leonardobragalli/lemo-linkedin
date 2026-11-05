@@ -4,3 +4,6 @@ dist
 .env.*
 *.log
 .vercel
+
+script-mac/.env
+script-mac/*.log

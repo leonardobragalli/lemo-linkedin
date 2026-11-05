@@ -20,7 +20,7 @@ Da fare: secrets (Gemini, Notion) → test generazione vera; test userscript in 
 
 ## Ruolo e regole di lavoro
 
-Lavori per **Leonardo Bragalli**, BizOps Engineer di Lemons in the Room (LEMO), startup fiorentina che porta la realtà virtuale immersiva negli ospedali con **LEMO, dispositivo medico marcato CE in Classe I** (destinazione d'uso: comfort e benessere emotivo durante ricoveri e procedure).
+Lavori per **Leonardo Bragalli**, BizOps Engineer di Lemons in the room (LEMO), startup fiorentina che porta la realtà virtuale immersiva negli ospedali con **LEMO, dispositivo medico marcato CE in Classe I** (destinazione d'uso: comfort e benessere emotivo durante ricoveri e procedure).
 
 Regole non negoziabili:
 1. **Mai inventare dati, numeri o claim.** Dove manca un dato scrivi `DA CHIEDERE` e chiedi a Leonardo.
@@ -35,7 +35,7 @@ Regole non negoziabili:
 
 ## Primo passo sull'altro PC: accessi (prima di toccare qualsiasi cosa)
 
-Nessuna credenziale è in questo file. Verifica ogni accesso e, se manca, chiedi a chi usa il PC di fare il login (si apre il browser). Chiedi subito **di chi è il PC**: se non è di Leonardo, il proprietario va prima aggiunto da Leonardo all'org Supabase "Lemons In The Room" e come collaboratore del repo GitHub.
+Nessuna credenziale è in questo file. Verifica ogni accesso e, se manca, chiedi a chi usa il PC di fare il login (si apre il browser). Chiedi subito **di chi è il PC**: se non è di Leonardo, il proprietario va prima aggiunto da Leonardo all'org Supabase "Lemons in the room" e come collaboratore del repo GitHub.
 
 | Servizio | Come verificarlo | Se manca |
 |---|---|---|
@@ -54,7 +54,7 @@ Poi: `npm install` (su Windows lancialo in background, può superare il timeout)
 |---|---|
 | Repo | GitHub `leonardobragalli/lemo-linkedin` (pubblico) → clona in `C:/Users/<utente>/Desktop/lemo-linkedin` |
 | Stack | React 19 + Vite 7, CSS semplice (no Tailwind), `@supabase/supabase-js` |
-| Database | Supabase org "Lemons In The Room", progetto `lemo-linkedin`, ref `qpufcekagamvpubosisj`, eu-central-1. Collegalo con l'MCP Supabase del catalogo Hermes (OAuth, mai token in chat) |
+| Database | Supabase org "Lemons in the room", progetto `lemo-linkedin`, ref `qpufcekagamvpubosisj`, eu-central-1. Collegalo con l'MCP Supabase del catalogo Hermes (OAuth, mai token in chat) |
 | Hosting | Vercel (import da vercel.com/new fatto da Leonardo; verifica che sia online e qual è l'URL) |
 | Schema | `supabase/migrations/20261029_schema_iniziale.sql`: `team_members` (10 profili, `is_admin`, `email`), `posts` (stato `da_rivedere/approvato/pubblicato/scartato`, origine `piano/storico/nuovo`, `ganci_opzioni`, `vis`, `linkedin_urn`), `post_metrics` (snapshot per post), `member_metrics` (follower per giorno) |
 | Sicurezza | RLS: tutto il team legge tutto; ognuno scrive solo i propri post/metriche; admin tutto. Trigger che rifiuta account per email non presenti in `team_members`. Guardia contro auto-promozione admin. Testata via REST |

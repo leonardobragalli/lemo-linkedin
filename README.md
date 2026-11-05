@@ -1,4 +1,4 @@
-# lemo-linkedin — Regia LinkedIn del team Lemons in the Room
+# lemo-linkedin — Regia LinkedIn del team Lemons in the room
 
 App web (React + Vite) per pianificare, rivedere e tracciare i post LinkedIn dei 10 profili del team.
 Dati e accessi su Supabase (progetto `lemo-linkedin`, ref `qpufcekagamvpubosisj`), hosting Vercel.

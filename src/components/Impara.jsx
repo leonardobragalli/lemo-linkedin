@@ -110,7 +110,7 @@ export default function Impara({ members, posts, me, apri }) {
           <h3>Base di conoscenza</h3>
           <p className="small">{kb.tot} documenti: {kb.per.insights_studio || 0} studi da Lemons Insights · {kb.per.notion || 0} pagine Notion (paper, press, blog, procedure, esperienze, post passati).</p>
           {!kb.per.notion && <p className="small errtxt">Notion non ancora collegato{me.is_admin ? ': chiave e database si gestiscono in Impostazioni.' : '.'}</p>}
-          <button className="btn ghost sm" onClick={aggiornaFonti} disabled={!!busy}>{busy === 'fonti' ? 'Aggiorno…' : 'Aggiorna ora'}</button>
+          <button className="btn ghost sm" onClick={aggiornaFonti} disabled={!!busy}>{busy === 'fonti' ? 'Aggiorno…' : 'Aggiorna Insights ora'}</button>
           <table className="tbl" style={{ marginTop: 10 }}><tbody>{sync.map(s => (
             <tr key={s.id}><td className="small">{fmtData(s.created_at)}</td><td className="small">{s.job}</td><td>{s.ok ? '✓' : <span className="errtxt">errore</span>}</td>
               <td className="small muted">{s.dettagli && JSON.stringify(s.dettagli).slice(0, 90)}</td></tr>
@@ -119,11 +119,11 @@ export default function Impara({ members, posts, me, apri }) {
 
         <div className="card">
           <h3>Numeri aziendali</h3>
-          <p className="small muted">L'AI usa un numero aziendale solo se è confermato con la fonte o calcolato in automatico da Notion.{me.is_admin && <> Si modificano in <a href="#impostazioni" onClick={() => setTimeout(() => location.reload(), 0)}>Impostazioni</a>.</>}</p>
+          <p className="small muted">L'AI usa un numero aziendale solo se un admin l'ha confermato con la fonte.{me.is_admin && <> Si modificano in <a href="#impostazioni" onClick={() => setTimeout(() => location.reload(), 0)}>Impostazioni</a>.</>}</p>
           <table className="tbl"><tbody>{facts.map(f => (
             <tr key={f.id}>
               <td>{f.etichetta}</td><td><b>{f.valore}</b></td>
-              <td className="small">{f.confermato_il ? <span style={{ color: '#047857' }}>✓ {f.automatico ? 'automatico da Notion' : f.fonte}</span> : <span className="errtxt">{f.note || 'DA VERIFICARE'}</span>}</td>
+              <td className="small">{f.confermato_il ? <span style={{ color: '#047857' }}>✓ {f.fonte}</span> : <span className="errtxt">{f.note || 'DA VERIFICARE'}</span>}</td>
             </tr>
           ))}</tbody></table>
         </div>
