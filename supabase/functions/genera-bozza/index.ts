@@ -125,8 +125,8 @@ const SCHEMA_GRAFICA = {
   properties: {
     modello: { type: 'STRING' }, stile: { type: 'STRING' },
   etichetta: { type: 'STRING', maxLength: 40, description: 'tema in 2-4 parole, nella lingua del post, va in alto in maiuscoletto' },
-    titolo: { type: 'STRING', maxLength: 70, description: 'max 9 parole' },
-    parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare: mai il solo numero' },
+    titolo: { type: 'STRING', maxLength: 70, description: 'max 9 parole. Frase ad effetto che ribalta un\'aspettativa comune (es. «La paura dell\'ago non è una cosa da bambini»), vera e coerente col post, mai uno slogan vuoto' },
+    parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare: quella che ribalta l\'aspettativa (es. «non è una cosa da bambini»); mai il solo numero' },
     sottotitolo: { type: 'STRING', maxLength: 130, description: 'una frase breve' },
     numero: { type: 'STRING', maxLength: 12, description: 'solo se preso dalle fonti o dai numeri aziendali' },
     etichetta_numero: { type: 'STRING', maxLength: 80, description: 'cosa misura il numero, 3-8 parole; il titolo deve dire perché conta' },
@@ -214,10 +214,15 @@ Deno.serve(async req => {
         const vis = orig.vis || {};
         const prec = [...(vis.versioni || (vis.grafica ? [vis.grafica] : []))];
         const en = linguaOrig === 'en';
-        const gr = await chiamaSemplice(
-          `Sei il grafico LinkedIn di Lemons in the room. Scrivi SOLO i testi di una grafica 4:5 per il post dato, in ${en ? 'INGLESE' : 'ITALIANO'}.\n${VINCOLI}\nRegole: titolo max 9 parole, una sola idea; parola_chiave = parte del titolo da evidenziare; numeri SOLO se presenti nel post (copiali identici, con la fonte in fonte_breve); per il carosello 3-7 slide, una idea ciascuna; se il post è un elenco numerato, titoli delle slide che iniziano con "1. ", "2. "...; domanda_finale specifica e vera. Fai una versione DIVERSA dalle precedenti: altro taglio, altro titolo, altra parola chiave.`,
-          `POST:\n${orig.testo}\n\nFONTI (primo commento):\n${orig.commento || '-'}\n\nVERSIONI PRECEDENTI DA NON RIPETERE:\n${prec.map((x: any) => `- ${x.titolo} | ${(x.slide || []).map((y: any) => y.titolo).join(' / ')}`).join('\n')}\n\nModello da usare: ${body.modello || vis.grafica?.modello || 'scegli tu'}.`,
+        const sistemaGrafica = `Sei il grafico LinkedIn di Lemons in the room. Scrivi SOLO i testi di una grafica 4:5 per il post dato, in ${en ? 'INGLESE' : 'ITALIANO'}.\n${VINCOLI}\nRegole: titolo max 9 parole, una sola idea, scritto come frase ad effetto che ribalta un'aspettativa comune (modello: «La paura dell'ago non è una cosa da bambini»), vero e coerente col post; parola_chiave = la parte che ribalta l'aspettativa; numeri SOLO se presenti nel post (copiali identici, con la fonte in fonte_breve); per il carosello 3-7 slide, una idea ciascuna; se il post è un elenco numerato, titoli delle slide che iniziano con "1. ", "2. "...; domanda_finale specifica e vera. Fai una versione DIVERSA dalle precedenti: altro taglio, altro titolo, altra parola chiave.`;
+        const utenteGrafica = `POST:\n${orig.testo}\n\nFONTI (primo commento):\n${orig.commento || '-'}\n\nVERSIONI PRECEDENTI DA NON RIPETERE:\n${prec.map((x: any) => `- ${x.titolo} | ${(x.slide || []).map((y: any) => y.titolo).join(' / ')}`).join('\n')}\n\nModello da usare: ${body.modello || vis.grafica?.modello || 'scegli tu'}.`;
+        const gr = await chiamaSemplice(sistemaGrafica, utenteGrafica,
           SCHEMA_GRAFICA);
+        const sporco = (x: any) => /[\n\t\r]/.test(`${x?.titolo || ''}${x?.parola_chiave || ''}${x?.sottotitolo || ''}${(x?.slide || []).map((y: any) => y.titolo + y.testo).join('')}`);
+        let grOk = gr;
+        if (sporco(gr)) grOk = await chiamaSemplice(sistemaGrafica, utenteGrafica, SCHEMA_GRAFICA);
+        if (sporco(grOk)) return json({ error: "La grafica è uscita con dei caratteri sbagliati: riprova" }, 502);
+        Object.assign(gr, grOk);
         const nuova = { ...gr, stile: ['scientifico', 'friendly'].includes(gr.stile) ? gr.stile : (vis.grafica?.stile || 'friendly'), modello: body.modello || gr.modello || vis.grafica?.modello };
         const versioni = [...prec, nuova].slice(-12);
         const { data: post, error } = await db.from('posts').update({ vis: { ...visDa(nuova, vis), versioni }, updated_by: meId }).eq('id', orig.id).select().single();
@@ -332,7 +337,7 @@ Deno.serve(async req => {
     `STUDI SCIENTIFICI (unica base per numeri e risultati clinici; nel testo cita autore e anno a parole, mai [1] o [2]; dettagli completi nel primo commento):\n${studi.map(f => `- ${f.verificato ? `[${f.verificato.primo} et al., ${f.verificato.rivista}, ${f.verificato.anno}] ` : ''}${f.titolo} — ${f.url || 's.u.'}\n${String(f.testo || '').slice(0, 1000)}`).join('\n') || '(nessuno studio pertinente: niente numeri clinici)'}`,
     interni.length ? `MATERIALE INTERNO DI LEMONS IN THE ROOM (solo per contesto e tono: NON prendere da qui numeri o percentuali, non sono verificati):\n${interni.map(f => `- ${f.titolo}\n${String(f.testo || '').slice(0, 600)}`).join('\n')}` : '',
     `NUMERI AZIENDALI UTILIZZABILI (al massimo 2 per post e solo se servono al tema; usa la chiave in numeri_aziendali_usati):\n${(facts || []).map(f => `- ${f.chiave} [${f.stato}]: ${f.etichetta} = ${f.valore}`).join('\n') || '(nessuno: non usare numeri aziendali)'}`,
-    `Restituisci 3 aperture alternative di tipi diversi (tra: ${APERTURE.join(', ')}); la prima è la consigliata. "grafica": scegli il modello più adatto (numero se c'è un dato forte con fonte, carosello se il post è un elenco o un percorso a passi, frase altrimenti; foto solo se l'autore lo chiede) e lo stile (scientifico se il post riporta uno studio clinico, altrimenti ${autore.stile_grafico || 'friendly'}).`,
+    `Restituisci 3 aperture alternative di tipi diversi (tra: ${APERTURE.join(', ')}); la prima è la consigliata. "grafica": scegli il modello più adatto (numero se c'è un dato forte con fonte, carosello se il post è un elenco o un percorso a passi, frase altrimenti; foto solo se l'autore lo chiede) il titolo della grafica come frase ad effetto che ribalta un'aspettativa comune (modello: «La paura dell'ago non è una cosa da bambini»), con la parte che ribalta come parola_chiave; e lo stile (scientifico se il post riporta uno studio clinico, altrimenti ${autore.stile_grafico || 'friendly'}).`,
   ].filter(Boolean).join('\n\n');
 
   const VOICE = await leggiVoice();
