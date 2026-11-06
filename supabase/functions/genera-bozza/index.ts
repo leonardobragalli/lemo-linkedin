@@ -124,11 +124,12 @@ const SCHEMA_GRAFICA = {
   description: 'Testi per la grafica 4:5. modello: frase | numero | carosello | foto. stile: scientifico (studi clinici) | friendly (tutto il resto).',
   properties: {
     modello: { type: 'STRING' }, stile: { type: 'STRING' },
+  etichetta: { type: 'STRING', maxLength: 40, description: 'tema in 2-4 parole, nella lingua del post, va in alto in maiuscoletto' },
     titolo: { type: 'STRING', maxLength: 70, description: 'max 9 parole' },
-    parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare' },
+    parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare: mai il solo numero' },
     sottotitolo: { type: 'STRING', maxLength: 130, description: 'una frase breve' },
     numero: { type: 'STRING', maxLength: 12, description: 'solo se preso dalle fonti o dai numeri aziendali' },
-    etichetta_numero: { type: 'STRING', maxLength: 80 },
+    etichetta_numero: { type: 'STRING', maxLength: 80, description: 'cosa misura il numero, 3-8 parole; il titolo deve dire perché conta' },
     fonte_breve: { type: 'STRING', maxLength: 90, description: 'es. Autore et al., Rivista Anno' },
     slide: { type: 'ARRAY', maxItems: 7, items: { type: 'OBJECT', properties: { titolo: { type: 'STRING', maxLength: 70 }, testo: { type: 'STRING', maxLength: 220 }, numero: { type: 'STRING', maxLength: 12 } }, required: ['titolo', 'testo'] }, description: 'solo per carosello: 3-7 slide interne, una idea ciascuna' },
     domanda_finale: { type: 'STRING', maxLength: 140 },
@@ -371,9 +372,18 @@ Deno.serve(async req => {
     for (const f of studi) { const v = f.verificato; if (!v?.primo) continue;
       for (const m of testo.matchAll(new RegExp(v.primo + '[^()\n]{0,25}?[(,]\s*(\d{4})', 'g'))) if (m[1] !== v.anno) problemi.push(`anno sbagliato per ${v.primo}: ${m[1]} invece di ${v.anno}`); }
     if (ripetuti.length >= 3) problemi.push(`frasi già usate dal team: «${ripetuti[0]}»`);
+    for (const f of (facts || []).filter(f => (g.numeri_aziendali_usati || []).includes(f.chiave))) {
+      const num = String(f.valore).match(/\d[\d.,]*/)?.[0]; if (!num) continue;
+      const base = `${f.valore} ${f.etichetta}`.toLowerCase();
+      for (const m of testo.matchAll(new RegExp('(?<![\\d.,])' + num.replace(/[.,]/g, '[.,]?') + '(?![.,]?\\d)', 'g'))) {
+        const intorno = testo.slice(Math.max(0, m.index! - 70), m.index! + 70).toLowerCase();
+        const extra = ['reparto', 'ward', 'contemporaneamente', 'simultaneously', 'al giorno', 'per day', 'italia', 'spagna', 'italy', 'spain', 'europa', 'europe'].find(w => intorno.includes(w) && !base.includes(w));
+        if (extra) { problemi.push(`numero aziendale «${num}» usato in un contesto che il dato non contiene («${extra}»): riportalo com'è`); break; }
+      }
+    }
     if ((g.numeri_aziendali_usati || []).length > 2) problemi.push(`${g.numeri_aziendali_usati.length} numeri aziendali (massimo 2)`);
     // episodi non forniti: domande ricevute, feedback, "oggi siamo a…" (ammessi solo se l'autore li ha scritti nelle istruzioni)
-    const ep = testo.match(/(una delle domande più frequenti|spesso ci (?:chiedono|domandano)|mi (?:chiedono|domandano) spesso|quel feedback|ci porta oggi|oggi siamo a|often (?:asked|ask|encounter|hear)|a question I (?:often|frequently)|last week we|ieri (?:in|al|a) reparto)/i);
+    const ep = testo.match(/(una delle domande più frequenti|spesso ci (?:chiedono|domandano)|mi (?:chiedono|domandano) spesso|quel feedback|ci porta oggi|oggi siamo a|often (?:asked|ask|encounter|hear)|a question I (?:often|frequently)|comes up (?:consistently|again and again|every time)|I always (?:share|tell|say|answer)|every time we (?:meet|present|talk)|quell'esperienza|ci chiedono sempre|ci viene chiest[oa] spesso|last week we|ieri (?:in|al|a) reparto)/i);
     if (ep && !String(body.istruzioni || '').trim()) problemi.push(`episodio non presente nelle fonti («${ep[0]}»): scrivi una riflessione, non un fatto accaduto`);
     return { problemi, testo };
   };
@@ -396,7 +406,8 @@ Deno.serve(async req => {
       return json({ error: /timeout|abort/i.test(String(e)) ? "L'AI ci sta mettendo troppo: riprova" : String((e as Error).message || e) }, 502);
   }
 
-  const testo = esito.testo.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  let testo = esito.testo.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  if (inglese) testo = testo.replace(/(\d)\.(\d{3})(?!\d)/g, '$1,$2');   // 30.000 → 30,000 nei post in inglese
 
   // numeri: ognuno deve stare nelle fonti o nei numeri aziendali
   const base = [studi.map(f => `${f.titolo} ${f.testo}`).join(' '), (facts || []).map(f => f.valore).join(' ')].join(' ').replace(/(\d)[.,](\d{3})/g, '$1$2');

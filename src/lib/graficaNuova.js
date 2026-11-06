@@ -66,6 +66,7 @@ function scrivi(ctx, testo, chiave, x, y, opz) {
   const { s, r, lh } = adatta(ctx, ws, opz);
   ctx.font = `${opz.peso} ${s}px ${opz.font}`;
   ctx.textBaseline = 'alphabetic';
+  if (opz.misura) return y + s * 0.86 + (r.length - 1) * s * lh + s * 0.25;
   let yy = y + s * 0.86;
   for (const l of r) {
     let xx = x;
@@ -138,21 +139,45 @@ function frase(ctx, g, st, ctxPost) {
 }
 
 function numero(ctx, g, st, ctxPost) {
-  if (st === 'scientifico') {
-    const T = tema(st);
-    fondo(ctx, T.sfondo);
-    etichetta(ctx, g.etichetta || ctxPost.tema, 90, 96, T.accento);
-    const y = scrivi(ctx, g.numero, g.numero, 90, 170, { font: RECO, peso: 700, da: 300, a: 140, maxW: 900, maxH: 300, maxRighe: 1, lh: 0.9, colore: T.accento, accento: T.accento });
-    scrivi(ctx, g.etichetta_numero || g.titolo, '', 90, y + 50, { font: RECO, peso: 700, da: 76, a: 44, maxW: 900, maxH: 420, maxRighe: 5, colore: T.testo });
-    if (ctxPost.riferimento) riferimento(ctx, ctxPost.riferimento, 90, H - 200, 560, T.rif);
-    logo(ctx, T.logo, 330);
-    return;
-  }
-  fondo(ctx, C.arancio);
-  const y = scrivi(ctx, g.numero, '', 90, 150, { font: RECO, peso: 700, da: 400, a: 160, maxW: 900, maxH: 380, maxRighe: 1, lh: 0.9, colore: C.bianco });
-  const y2 = scrivi(ctx, g.etichetta_numero || g.titolo, g.parola_chiave, 90, y + 60, { font: RECO, peso: 700, da: 80, a: 46, maxW: 880, maxH: 380, maxRighe: 5, colore: C.marrone, accento: C.bianco });
-  if (g.fonte_breve || ctxPost.riferimento) scrivi(ctx, g.fonte_breve || ctxPost.riferimento, '', 90, y2 + 40, { font: RUNDE, peso: 500, da: 28, a: 22, maxW: 520, maxH: 130, maxRighe: 3, lh: 1.4, colore: 'rgba(79,29,0,.85)' });
-  logo(ctx, 'white');
+  // Il numero da solo non dice niente: sotto c'è l'etichetta (cosa misura) e, se l'etichetta è corta,
+  // il titolo come messaggio con la parola chiave evidenziata. In alto il tema. Il blocco è centrato in verticale.
+  const sci = st === 'scientifico';
+  const T = tema(st);
+  const colTesto = sci ? T.testo : C.marrone;
+  const colNumero = sci ? T.accento : C.bianco;
+  fondo(ctx, sci ? T.sfondo : C.arancio);
+  const kicker = pulisci(g.etichetta || ctxPost.tema).replace(/\s*[(\[].*$/, '');
+  if (kicker) etichetta(ctx, kicker, 90, 96, sci ? T.accento : C.marrone);
+  const lbl = pulisci(g.etichetta_numero);
+  const corta = lbl.split(' ').length <= 9;
+  const messaggio = corta && g.titolo && pulisci(g.titolo).toLowerCase() !== lbl.toLowerCase() ? g.titolo : '';
+  // se l'AI ha scelto come parola chiave il numero stesso, nel messaggio evidenzio il numero (es. «from 4 to 16»)
+  const chiave = pulisci(g.parola_chiave) === pulisci(g.numero) ? (messaggio.includes(pulisci(g.numero)) ? pulisci(g.numero) : '') : g.parola_chiave;
+  const nCar = pulisci(g.numero).length;
+  const blocchi = [
+    [g.numero, '', { font: RECO, peso: 700, da: nCar <= 3 ? 600 : 400, a: 150, maxW: 900, maxH: 560, maxRighe: 1, lh: 0.9, colore: colNumero }, 0],
+    lbl && [lbl, messaggio ? '' : chiave, { font: RECO, peso: 700, da: messaggio ? 54 : 80, a: 40, maxW: 900, maxH: messaggio ? 130 : 400, maxRighe: messaggio ? 2 : 5, colore: messaggio ? colNumero : colTesto, accento: colNumero }, 30],
+    messaggio && ['§', '', null, 46],
+    messaggio && [messaggio, chiave, { font: RECO, peso: 700, da: 90, a: 46, maxW: 900, maxH: 300, maxRighe: 3, colore: colTesto, accento: colNumero }, 40],
+    !messaggio && g.sottotitolo && [g.sottotitolo, '', { font: RUNDE, peso: 500, da: 38, a: 28, maxW: 860, maxH: 160, maxRighe: 3, lh: 1.38, colore: colTesto }, 30],
+  ].filter(Boolean);
+  const disegna = (y0, misura) => {
+    let y = y0;
+    for (const [t, k, o, gap] of blocchi) {
+      y += gap;
+      if (t === '§') { if (!misura) { ctx.fillStyle = sci ? 'rgba(3,9,27,.15)' : 'rgba(79,29,0,.28)'; ctx.fillRect(90, y, 120, 6); } y += 6; continue; }
+      y = scrivi(ctx, t, k, 90, y, { ...o, misura });
+    }
+    return y;
+  };
+  const top = 170, basso = H - 270;
+  // numero il più grande possibile, finché tutto il blocco sta tra il tema e il logo
+  let alto = disegna(0, true);
+  for (const d of [520, 460, 400, 340, 280, 220]) { if (alto <= basso - top) break; blocchi[0][2].da = d; alto = disegna(0, true); }
+  disegna(Math.max(top, top + (basso - top - alto) / 2), false);
+  const rif = sci ? ctxPost.riferimento : (g.fonte_breve || ctxPost.riferimento);
+  if (rif) riferimento(ctx, rif, 90, H - 200, sci ? 560 : 520, sci ? T.rif : 'rgba(79,29,0,.85)');
+  logo(ctx, sci ? T.logo : 'white', sci ? 330 : 380);
 }
 
 function caroselloCopertina(ctx, g, st, ctxPost, n) {
@@ -261,7 +286,7 @@ export async function grafichePost(post, { stile, modello, foto, conChiusura = t
   const riferimenti = riferimentiDa(post);
   // riferimento della tavola singola: lo studio citato nel titolo/numero, altrimenti il primo
   const testoTavola = `${g.titolo} ${g.etichetta_numero || ''} ${g.fonte_breve || ''}`;
-  const ctxPost = { tema: g.etichetta || post.tema || '', riferimenti, riferimento: riferimenti.find(r => r.autore && testoTavola.includes(r.autore))?.breve || g.fonte_breve || '' };
+  const ctxPost = { tema: g.etichetta || (post.generazione?.lingua === 'en' ? '' : post.tema) || '', riferimenti, riferimento: riferimenti.find(r => r.autore && testoTavola.includes(r.autore))?.breve || g.fonte_breve || '' };
   const pref = stile === 'scientifico' ? 'Scientifico' : 'Friendly';
   const out = [];
   const aggiungi = async (nome, disegna, mime = 'image/png') => {
