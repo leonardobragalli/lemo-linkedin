@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { avatar, STATI, fmtData, partiRoma, romaToIso, formattaPerLinkedIn, normalizzaTestoPuro, toBold, fromBold, isBold, estraiUrn, dataDaUrn, scaricaUrl, corpoDopoApertura } from '../lib/util.js';
 import { immaginiPost } from '../lib/grafica.js';
+import Grafiche from './Grafiche.jsx';
 import { interazioni } from '../lib/insights.js';
 
 const LIMITE = 3000;
@@ -18,6 +19,8 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState(null);
   const [imgs, setImgs] = useState(null);
+  const [scelte, setScelte] = useState(null);   // immagini dello stile scelto (bozze AI con grafica nuova)
+  const nuovaGrafica = !!post.vis?.grafica;
   const [conflitto, setConflitto] = useState(false);
   const [guida, setGuida] = useState(false);
   const baseUpdated = useRef(post.updated_at);
@@ -87,7 +90,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
     const w = window.open('about:blank', '_blank');
     try { await navigator.clipboard.writeText(testoLi); } catch { /* fallback sotto */ }
     let i = 0;
-    for (const im of (imgs || []).filter(x => !x.pdf || f.formato === 'carosello')) { i++; scaricaUrl(im.url, `${String(i).padStart(2, '0')}_${im.nome}`); await new Promise(r => setTimeout(r, 300)); }
+    for (const im of ((nuovaGrafica ? scelte : imgs) || []).filter(x => nuovaGrafica ? (x.pdf || !(scelte || []).some(y => y.pdf)) : (!x.pdf || f.formato === 'carosello'))) { i++; scaricaUrl(im.url, `${String(i).padStart(2, '0')}_${im.nome}`); await new Promise(r => setTimeout(r, 300)); }
     setGuida(true);
     if (w) w.location.href = 'https://www.linkedin.com/feed/?shareActive=true'; else window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank');
     setMsg({ ok: 'Testo copiato e immagini scaricate (01_, 02_…). Su LinkedIn: incolla, aggiungi le immagini, Pubblica o Pianifica.' });
@@ -175,7 +178,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
               </div>
             )}
             {post.generazione && <Generazione g={post.generazione} />}
-            <div className="imgs">
+            {nuovaGrafica ? <Grafiche post={post} vecchie={imgs} onScelta={setScelte} /> : <div className="imgs">
               {imgs === null && <div className="muted small">Genero le immagini…</div>}
               {imgs && imgs.length === 0 && <div className="muted small">Nessuna immagine per questo formato.</div>}
               {imgs && imgs.map(im => (
@@ -184,7 +187,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
                   <button className="btn ghost xs" onClick={() => scaricaUrl(im.url, im.nome)}>↓ {im.nome}</button>
                 </div>
               ))}
-            </div>
+            </div>}
             {member.id !== 'matteo' && post.origine === 'piano' && <p className="small muted">⚠ Le tavole dei colleghi contengono numeri fissi per slot (dal kit): verificali prima di pubblicare.</p>}
           </div>
         </div>
