@@ -33,7 +33,7 @@ export async function immaginiPost(member, post, idxSlot) {
   if (post.formato === 'testo' || post.origine === 'storico') return [];
   if (member.id === 'matteo' && post.origine === 'piano') return immaginiMatteo(post);
   await caricaAsset();
-  const prof = { ...member, avatar: await avatarDataUri(member.id) };
+  const prof = { ...member, avatar: await avatarDataUri(member.id), lang: post.generazione?.lingua || undefined };
   const pData = {
     id: post.slot || 'N',
     titolo: post.titolo || '',

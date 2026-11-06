@@ -119,6 +119,23 @@ async function datiPubmed(ids: string[]) {
 }
 const pmidDi = (f: any) => String(f?.url || '').match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/)?.[1] || String(f?.id || '').match(/^epmc_(\d+)$/)?.[1] || null;
 
+const SCHEMA_GRAFICA = {
+  type: 'OBJECT',
+  description: 'Testi per la grafica 4:5. modello: frase | numero | carosello | foto. stile: scientifico (studi clinici) | friendly (tutto il resto).',
+  properties: {
+    modello: { type: 'STRING' }, stile: { type: 'STRING' },
+    titolo: { type: 'STRING', maxLength: 70, description: 'max 9 parole' },
+    parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare' },
+    sottotitolo: { type: 'STRING', maxLength: 130, description: 'una frase breve' },
+    numero: { type: 'STRING', maxLength: 12, description: 'solo se preso dalle fonti o dai numeri aziendali' },
+    etichetta_numero: { type: 'STRING', maxLength: 80 },
+    fonte_breve: { type: 'STRING', maxLength: 90, description: 'es. Autore et al., Rivista Anno' },
+    slide: { type: 'ARRAY', maxItems: 7, items: { type: 'OBJECT', properties: { titolo: { type: 'STRING', maxLength: 70 }, testo: { type: 'STRING', maxLength: 220 }, numero: { type: 'STRING', maxLength: 12 } }, required: ['titolo', 'testo'] }, description: 'solo per carosello: 3-7 slide interne, una idea ciascuna' },
+    domanda_finale: { type: 'STRING', maxLength: 140 },
+  },
+  required: ['modello', 'stile', 'titolo'],
+};
+
 const SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -129,22 +146,7 @@ const SCHEMA = {
     fonti: { type: 'ARRAY', items: { type: 'OBJECT', properties: { testo: { type: 'STRING' }, url: { type: 'STRING' } }, required: ['testo'] } },
     claim: { type: 'ARRAY', items: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, fonte_url: { type: 'STRING', nullable: true } }, required: ['frase'] } },
     numeri_aziendali_usati: { type: 'ARRAY', items: { type: 'STRING' }, description: 'chiavi dei NUMERI AZIENDALI usati nel testo' },
-    grafica: {
-      type: 'OBJECT',
-      description: 'Testi per la grafica 4:5. modello: frase | numero | carosello | foto. stile: scientifico (studi clinici) | friendly (tutto il resto).',
-      properties: {
-        modello: { type: 'STRING' }, stile: { type: 'STRING' },
-        titolo: { type: 'STRING', maxLength: 70, description: 'max 9 parole' },
-        parola_chiave: { type: 'STRING', maxLength: 40, description: 'parte del titolo da colorare' },
-        sottotitolo: { type: 'STRING', maxLength: 130, description: 'una frase breve' },
-        numero: { type: 'STRING', maxLength: 12, description: 'solo se preso dalle fonti o dai numeri aziendali' },
-        etichetta_numero: { type: 'STRING', maxLength: 80 },
-        fonte_breve: { type: 'STRING', maxLength: 90, description: 'es. Autore et al., Rivista Anno' },
-        slide: { type: 'ARRAY', maxItems: 7, items: { type: 'OBJECT', properties: { titolo: { type: 'STRING', maxLength: 70 }, testo: { type: 'STRING', maxLength: 220 }, numero: { type: 'STRING', maxLength: 12 } }, required: ['titolo', 'testo'] }, description: 'solo per carosello: 3-7 slide interne, una idea ciascuna' },
-        domanda_finale: { type: 'STRING', maxLength: 140 },
-      },
-      required: ['modello', 'stile', 'titolo'],
-    },
+    grafica: SCHEMA_GRAFICA,
   },
   required: ['tema', 'aperture', 'corpo', 'fonti', 'claim', 'grafica'],
 };
@@ -178,6 +180,79 @@ Deno.serve(async req => {
   const autoreId: string = body.member_id || meId;
   if (autoreId !== meId && !isAdmin) return json({ error: 'Puoi generare bozze solo per te' }, 403);
   if (isAdmin && /^gemini-[a-z0-9.-]+$/.test(String(body.modello || ''))) MODEL = body.modello;  // solo per le prove
+
+  // ── azioni su una bozza esistente: traduzione e nuova versione della grafica ──
+  if (body.azione === 'traduci' || body.azione === 'grafica') {
+    const { data: orig } = await db.from('posts').select('*').eq('id', body.post_id).single();
+    if (!orig) return json({ error: 'Bozza non trovata' }, 404);
+    if (orig.member_id !== meId && !isAdmin) return json({ error: 'Puoi modificare solo le tue bozze' }, 403);
+    const linguaOrig = orig.generazione?.lingua || 'it';
+    const chiamaSemplice = async (sistema: string, testo: string, schema: any, tentativo = 1): Promise<any> => {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY }, signal: AbortSignal.timeout(90000),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: testo }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 1.0, maxOutputTokens: 6000, thinkingConfig: { thinkingBudget: 512 } } }),
+      });
+      if (!r.ok) throw new Error(r.status === 429 ? 'Limite del piano gratuito Gemini raggiunto: riprova tra qualche minuto' : `Errore Gemini ${r.status}`);
+      const out = await r.json();
+      const txt = (out.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || '').join('');
+      try { return JSON.parse(txt); }
+      catch {
+        // a volte il modello si inceppa ripetendo parole fino al limite: registro e riprovo una volta
+        await db.from('sync_log').insert({ job: 'genera-bozza', ok: false, dettagli: { azione: body.azione, fine: out.candidates?.[0]?.finishReason, coda: txt.slice(-300) } });
+        if (tentativo < 2) return chiamaSemplice(sistema, testo, schema, tentativo + 1);
+        throw new Error("Risposta dell'AI non valida: riprova");
+      }
+    };
+    const visDa = (gr: any, base: any = {}) => ({
+      ...base, grafica: gr, titolo: gr.titolo, sottotitolo: gr.sottotitolo || '',
+      punti: (gr.slide || []).map((x: any) => x.titolo).concat(['', '', '']).slice(0, Math.max(3, (gr.slide || []).length)),
+      metrica_val: gr.numero || '', metrica_lbl: gr.etichetta_numero || '', citazione: gr.fonte_breve || '',
+    });
+    try {
+      if (body.azione === 'grafica') {
+        const vis = orig.vis || {};
+        const prec = [...(vis.versioni || (vis.grafica ? [vis.grafica] : []))];
+        const en = linguaOrig === 'en';
+        const gr = await chiamaSemplice(
+          `Sei il grafico LinkedIn di Lemons in the room. Scrivi SOLO i testi di una grafica 4:5 per il post dato, in ${en ? 'INGLESE' : 'ITALIANO'}.\n${VINCOLI}\nRegole: titolo max 9 parole, una sola idea; parola_chiave = parte del titolo da evidenziare; numeri SOLO se presenti nel post (copiali identici, con la fonte in fonte_breve); per il carosello 3-7 slide, una idea ciascuna; se il post è un elenco numerato, titoli delle slide che iniziano con "1. ", "2. "...; domanda_finale specifica e vera. Fai una versione DIVERSA dalle precedenti: altro taglio, altro titolo, altra parola chiave.`,
+          `POST:\n${orig.testo}\n\nFONTI (primo commento):\n${orig.commento || '-'}\n\nVERSIONI PRECEDENTI DA NON RIPETERE:\n${prec.map((x: any) => `- ${x.titolo} | ${(x.slide || []).map((y: any) => y.titolo).join(' / ')}`).join('\n')}\n\nModello da usare: ${body.modello || vis.grafica?.modello || 'scegli tu'}.`,
+          SCHEMA_GRAFICA);
+        const nuova = { ...gr, stile: ['scientifico', 'friendly'].includes(gr.stile) ? gr.stile : (vis.grafica?.stile || 'friendly'), modello: body.modello || gr.modello || vis.grafica?.modello };
+        const versioni = [...prec, nuova].slice(-12);
+        const { data: post, error } = await db.from('posts').update({ vis: { ...visDa(nuova, vis), versioni }, updated_by: meId }).eq('id', orig.id).select().single();
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, post });
+      }
+      // traduzione: nuova bozza collegata all'originale
+      const verso = body.lingua === 'it' || body.lingua === 'en' ? body.lingua : (linguaOrig === 'en' ? 'it' : 'en');
+      const SCHEMA_TRAD = { type: 'OBJECT', properties: { aperture: SCHEMA.properties.aperture, corpo: SCHEMA.properties.corpo, tema: { type: 'STRING', description: 'tema tradotto, max 6 parole' }, grafica: SCHEMA_GRAFICA }, required: ['aperture', 'corpo', 'tema', 'grafica'] };
+      const tr = await chiamaSemplice(
+        `Traduci un post LinkedIn di Lemons in the room in ${verso === 'en' ? 'INGLESE naturale (non letterale), registro professionale' : 'ITALIANO naturale, con tutti gli accenti'}. Mantieni struttura, a capo, numeri, nomi di studi e autori identici; non aggiungere né togliere contenuti. Hashtag adattati alla lingua (0-3).\n${VINCOLI}`,
+        `APERTURE (la prima è quella usata nel post):\n${(orig.ganci_opzioni || []).map((x: any) => `${x.formula}: ${x.md}`).join('\n')}\n\nPOST COMPLETO:\n${orig.testo}\n\nTESTI DELLA GRAFICA (JSON):\n${JSON.stringify(orig.vis?.grafica || {})}\n\nRestituisci aperture (stessi tipi), corpo (il post SENZA la prima riga), tema e grafica tradotti.`,
+        SCHEMA_TRAD);
+      const ap = togliGrassetto(String(tr.aperture?.[0]?.testo || '')).trim();
+      let corpo = togliGrassetto(String(tr.corpo || '')).trim();
+      if (ap && corpo.startsWith(ap)) corpo = corpo.slice(ap.length).trim();
+      const testoTr = `${ap}\n\n${corpo}`.replace(/\n{3,}/g, '\n\n');
+      const grT = { ...(orig.vis?.grafica || {}), ...(tr.grafica || {}), stile: orig.vis?.grafica?.stile || 'friendly', modello: orig.vis?.grafica?.modello };
+      const commentoTr = orig.commento ? String(orig.commento).replace(/^(Fonti|Sources):/, verso === 'en' ? 'Sources:' : 'Fonti:') : null;
+      const temaTr = String(tr.tema || orig.tema || '');
+      const { data: post, error } = await db.from('posts').insert({
+        member_id: orig.member_id, origine: 'nuovo', stato: 'da_rivedere',
+        titolo: `[${verso.toUpperCase()}] ${temaTr.slice(0, 110)}`, tema: temaTr,
+        testo: testoTr, testo_generato: testoTr, testo_originale: testoTr, commento: commentoTr, fonti: orig.fonti, note: orig.note,
+        hook_formula: tr.aperture?.[0]?.tipo || orig.hook_formula,
+        ganci_opzioni: (tr.aperture || []).map((a: any) => { const t = togliGrassetto(a.testo).trim(); return { formula: a.tipo, md: t, uni: t }; }),
+        vis: { ...visDa(grT, orig.vis || {}), versioni: [grT], kicker: temaTr.toUpperCase().slice(0, 40), tema_breve: temaTr.toUpperCase().slice(0, 40) },
+        formato: orig.formato, generazione: { ...(orig.generazione || {}), lingua: verso, traduzione_di: orig.id, creato_da: meId, creato_il: new Date().toISOString() },
+        updated_by: meId,
+      }).select().single();
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, post });
+    } catch (e) {
+      return json({ error: /timeout|abort/i.test(String(e)) ? "L'AI ci sta mettendo troppo: riprova" : String((e as Error).message || e) }, 502);
+    }
+  }
 
   const ieri = new Date(Date.now() - 864e5).toISOString();
   const { count } = await db.from('posts').select('id', { count: 'exact', head: true }).not('testo_generato', 'is', null).eq('member_id', autoreId).gte('created_at', ieri);
@@ -354,7 +429,7 @@ Deno.serve(async req => {
     fonti: (g.fonti || []).map((f: any) => f.url ? `${f.testo} (${f.url})` : f.testo).join(' · '),
     hook_formula: g.aperture[0].tipo,
     ganci_opzioni: g.aperture.map((a: any) => { const t = togliGrassetto(a.testo).trim(); return { formula: a.tipo, md: t, uni: t }; }),
-    vis: { grafica, titolo: grafica.titolo, sottotitolo: grafica.sottotitolo || '', kicker: (g.tema || '').toUpperCase().slice(0, 40), tema_breve: (g.tema || '').toUpperCase().slice(0, 40), punti: (grafica.slide || []).map((s: any) => s.titolo).concat(['', '', '']).slice(0, Math.max(3, (grafica.slide || []).length)), metrica_val: grafica.numero || '', metrica_lbl: grafica.etichetta_numero || '', citazione: grafica.fonte_breve || '', kpi: [] },
+    vis: { grafica, versioni: [grafica], titolo: grafica.titolo, sottotitolo: grafica.sottotitolo || '', kicker: (g.tema || '').toUpperCase().slice(0, 40), tema_breve: (g.tema || '').toUpperCase().slice(0, 40), punti: (grafica.slide || []).map((s: any) => s.titolo).concat(['', '', '']).slice(0, Math.max(3, (grafica.slide || []).length)), metrica_val: grafica.numero || '', metrica_lbl: grafica.etichetta_numero || '', citazione: grafica.fonte_breve || '', kpi: [] },
     formato: grafica.modello === 'carosello' ? 'carosello' : 'immagini', note: nota, generazione,
     scheduled_at: body.scheduled_at || null, updated_by: meId,
   }).select().single();

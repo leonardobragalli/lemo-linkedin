@@ -178,7 +178,7 @@ export default function Editor({ post, members, posts, metrics, me, chiudi, appl
               </div>
             )}
             {post.generazione && <Generazione g={post.generazione} />}
-            {nuovaGrafica ? <Grafiche post={post} vecchie={imgs} onScelta={setScelte} /> : <div className="imgs">
+            {nuovaGrafica ? <Grafiche post={post} vecchie={imgs} onScelta={setScelte} me={me} applica={applica} puo={puoModificare} /> : <div className="imgs">
               {imgs === null && <div className="muted small">Genero le immagini…</div>}
               {imgs && imgs.length === 0 && <div className="muted small">Nessuna immagine per questo formato.</div>}
               {imgs && imgs.map(im => (

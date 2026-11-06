@@ -180,11 +180,11 @@ function caroselloSlide(ctx, s, i, numerate, st, ctxPost, n) {
   punti(ctx, n, i + 1, T.puntoOn, T.puntoOff);
   logo(ctx, T.logo, st === 'scientifico' ? 330 : 380);
 }
-function caroselloChiusura(ctx, g, st, n) {
+function caroselloChiusura(ctx, g, st, n, en) {
   const T = tema(st);
   fondo(ctx, C.lilla);
   const y = scrivi(ctx, g.domanda_finale, '', 90, 150, { font: RECO, peso: 700, da: 100, a: 56, maxW: T.limone ? 900 : 900, maxH: 560, maxRighe: 6, colore: st === 'scientifico' ? C.nero : C.marrone, accento: T.accento });
-  scrivi(ctx, 'Scrivetelo nei commenti.', '', 90, y + 50, { font: RUNDE, peso: 500, da: 44, a: 36, maxW: 600, maxH: 120, maxRighe: 2, lh: 1.38, colore: st === 'scientifico' ? C.nero : C.marrone });
+  scrivi(ctx, en ? 'Tell us in the comments.' : 'Scrivetelo nei commenti.', '', 90, y + 50, { font: RUNDE, peso: 500, da: 44, a: 36, maxW: 600, maxH: 120, maxRighe: 2, lh: 1.38, colore: st === 'scientifico' ? C.nero : C.marrone });
   if (T.limone) limone(ctx, 'limone_saluto', W - 90 - 330, H - 200 - 330, 330);
   punti(ctx, n, n - 1, T.puntoOn, T.puntoOff);
   logo(ctx, T.logo, st === 'scientifico' ? 330 : 380);
@@ -283,7 +283,7 @@ export async function grafichePost(post, { stile, modello, foto, conChiusura = t
     const n = 1 + sl.length + (finale ? 1 : 0);
     await aggiungi('01_copertina', ctx => caroselloCopertina(ctx, g, stile, ctxPost, n));
     for (let i = 0; i < sl.length; i++) await aggiungi(`${String(i + 2).padStart(2, '0')}_slide`, ctx => caroselloSlide(ctx, sl[i], i, numerate, stile, ctxPost, n));
-    if (finale) await aggiungi(`${String(n).padStart(2, '0')}_chiusura_facoltativa`, ctx => caroselloChiusura(ctx, g, stile, n));
+    if (finale) await aggiungi(`${String(n).padStart(2, '0')}_chiusura_facoltativa`, ctx => caroselloChiusura(ctx, g, stile, n, post.generazione?.lingua === 'en'));
   }
   return { modello: m, immagini: out };
 }

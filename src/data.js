@@ -33,7 +33,8 @@ export function useTeamData(session) {
           else {
             const row = payload.new;
             const i = arr.findIndex(x => x.id === row.id);
-            arr = i >= 0 ? arr.map(x => (x.id === row.id ? row : x)) : [...arr, row];
+            // gli UPDATE in tempo reale non riportano i campi lunghi rimasti uguali (es. testo_generato): li tengo da quelli già caricati
+            arr = i >= 0 ? arr.map(x => (x.id === row.id ? { ...x, ...row } : x)) : [...arr, row];
           }
           return { ...s, [k]: arr };
         });

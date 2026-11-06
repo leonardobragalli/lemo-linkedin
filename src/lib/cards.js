@@ -87,7 +87,7 @@ function estraiTreKpiCollega(prof, pData, v){
     if (k.length) return k;
     return [{ tag: 'DISPOSITIVO', val: 'LEMO', desc: 'Dispositivo medico CE' }, { tag: 'TEAM', val: 'Lemons', desc: 'in the room' }, { tag: 'FIRENZE', val: '🍋', desc: 'Realtà virtuale in ospedale' }];
   }
-  const isEn = (prof.id === 'lazar');
+  const isEn = prof.lang ? prof.lang === 'en' : (prof.id === 'lazar');
   const pid = pData.id;
   const mVal = v.metrica_val || 'LEMO CE';
   const mLbl = (v.metrica_lbl || 'Evidenza verificata').slice(0, 32);
@@ -280,7 +280,7 @@ function generaSvgCardCollega(prof, pData, idxSlot, tipo, includeFonts){
   const ruoloBreve = prof.ruolo.replace(/[@·]\s*Lemons in the room/i, '').trim();
   const fontCssTag = (includeFonts && window.LEMONS_FONTS_CSS) ? `<style>${window.LEMONS_FONTS_CSS}</style>` : '';
   const kpis = estraiTreKpiCollega(prof, pData, v);
-  const isEn = (prof.id === 'lazar');
+  const isEn = prof.lang ? prof.lang === 'en' : (prof.id === 'lazar');
 
   if (tipo === 1) {
     // ── 4 ARCHITETTURE EDITORIALI DI COPERTINA AD ALTA AUTOREVOLEZZA (ALLINEATE ALLE NUOVE COPERTINE DI MATTEO) ──

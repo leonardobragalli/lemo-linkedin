@@ -15,7 +15,7 @@ function conGancio(post, i) {
 
 export default function BozzeAI({ members, posts, me, apri, applica }) {
   const [chi, setChi] = useState(() => P()?.profiloAttivo() || me.id);
-  const [gen, setGen] = useState({ tema: '', istruzioni: '' });
+  const [gen, setGen] = useState({ tema: '', istruzioni: '', lingua: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [facts, setFacts] = useState({});
@@ -36,7 +36,9 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)), [posts, chi]);
 
   async function genera(rifai) {
-    const corpo = rifai || { member_id: chi, tema: gen.tema, istruzioni: gen.istruzioni };
+    const linguaDef = members.find(m => m.id === chi)?.lingua || 'it';
+    const lingua = gen.lingua || linguaDef;
+    const corpo = rifai || { member_id: chi, tema: gen.tema, istruzioni: gen.istruzioni, lingua: lingua === 'entrambe' ? linguaDef : lingua };
     setBusy(true); setErr(null);
     const { data: s } = await supabase.auth.getSession();
     const r = await fetch(`${supabaseUrl}/functions/v1/genera-bozza`, {
@@ -47,7 +49,21 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
     setBusy(false);
     if (!r.ok) { setErr(j.error || `Errore ${r.status}`); return; }
     applica('posts', j.post);
-    if (!rifai) setGen({ tema: '', istruzioni: '' });
+    if (!rifai && lingua === 'entrambe') await traduci(j.post, linguaDef === 'en' ? 'it' : 'en');
+    if (!rifai) setGen({ tema: '', istruzioni: '', lingua: gen.lingua });
+  }
+
+  async function traduci(post, verso) {
+    setBusy(true); setErr(null);
+    const { data: s } = await supabase.auth.getSession();
+    const r = await fetch(`${supabaseUrl}/functions/v1/genera-bozza`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + s.session.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'traduci', post_id: post.id, lingua: verso }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) { setErr(j.error || `Errore ${r.status}`); return; }
+    applica('posts', j.post);
   }
 
   const nome = members.find(m => m.id === chi)?.nome || chi;
@@ -69,20 +85,24 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
             <label>Tema (facoltativo) <input value={gen.tema} onChange={e => setGen({ ...gen, tema: e.target.value })} placeholder="es. ansia prima dei prelievi in pediatria" /></label>
             <label>Istruzioni (facoltative) <textarea rows={2} value={gen.istruzioni} onChange={e => setGen({ ...gen, istruzioni: e.target.value })} placeholder="es. racconta la consegna di ieri al Meyer, tono pratico" /></label>
             <div className="row tight" style={{ marginTop: 8 }}>
-              <button className="btn orange" disabled={busy} onClick={() => genera()}>{busy ? 'Scrivo… (10-30 s)' : '✨ Genera bozza'}</button>
+              <label className="small">Lingua <select value={gen.lingua || (members.find(m => m.id === chi)?.lingua || 'it')} onChange={e => setGen({ ...gen, lingua: e.target.value })}>
+                <option value="it">Italiano</option><option value="en">English</option><option value="entrambe">Entrambe (IT + EN)</option>
+              </select></label>
+              <button className="btn orange" disabled={busy} onClick={() => genera()}>{busy ? 'Scrivo… (10-40 s)' : '✨ Genera bozza'}</button>
               {err && <span className="errtxt small">{err}</span>}
             </div>
           </>
         ) : <p className="small errtxt">Puoi generare bozze solo per il tuo profilo.</p>}
       </div>
 
-      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} facts={facts} rigenera={() => genera({ member_id: p.member_id, tema: p.tema || '' })} busy={busy} />)}
+      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} facts={facts} rigenera={() => genera({ member_id: p.member_id, tema: p.tema || '', lingua: p.generazione?.lingua })} traduci={traduci} busy={busy} />)}
       {!bozze.length && <p className="muted">Nessuna bozza AI per {nome}.</p>}
     </div>
   );
 }
 
-function Bozza({ post, chi, puo, apri, facts, rigenera, busy }) {
+function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy }) {
+  const lingua = post.generazione?.lingua || 'it';
   const [gancio, setGancio] = useState(0);
   const [slot, setSlot] = useState('');
   const [msg, setMsg] = useState(null);
@@ -104,7 +124,7 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, busy }) {
     <div className="card">
       <div className="row tight" style={{ justifyContent: 'space-between' }}>
         <b>{primaRiga(testo).slice(0, 110)}</b>
-        <span className="small muted">{fmtData(post.created_at)}{post.generazione?.esplorazione ? ' · esplorazione' : ''}</span>
+        <span className="small muted"><span className="badge">{lingua.toUpperCase()}</span> {fmtData(post.created_at)}{post.generazione?.esplorazione ? ' · esplorazione' : ''}</span>
       </div>
       {(post.ganci_opzioni || []).length > 1 && (
         <div className="row tight" style={{ margin: '6px 0' }}>
@@ -132,6 +152,7 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, busy }) {
           <button className="btn sm" disabled={!slot} onClick={metti}>Metti nello slot</button>
         </>}
         <button className="btn ghost sm" onClick={() => apri(post.id)}>Apri con grafica</button>
+        {puo && <button className="btn ghost sm" disabled={busy} onClick={() => traduci(post, lingua === 'en' ? 'it' : 'en')}>{lingua === 'en' ? 'Crea versione in italiano' : 'Crea versione in inglese'}</button>}
         {msg && <span className="small">{msg}</span>}
       </div>
     </div>
