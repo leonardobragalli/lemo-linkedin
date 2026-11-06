@@ -435,7 +435,18 @@ Deno.serve(async req => {
     fonti_usate: fonti.map(f => ({ id: f.id, titolo: f.titolo, url: f.url })),
     numeri_aziendali_usati: usati, numeri_valori: Object.fromEntries(usati.map((k: string) => [k, (facts || []).find(f => f.chiave === k)?.valore])), controlli: esito.problemi, claim, numeri_da_verificare: daVerificare,
     creato_da: meId, creato_il: new Date().toISOString(),
+    tema_richiesto: tema || null, istruzioni: body.istruzioni ? String(body.istruzioni).slice(0, 800) : null,
   };
+  // «Rigenera testo»: la nuova bozza prende il posto della vecchia, che resta come versione precedente
+  let vecchia: any = null;
+  if (body.sostituisci) {
+    const { data: v } = await db.from('posts').select('*').eq('id', body.sostituisci).single();
+    if (v && v.origine === 'nuovo' && (v.member_id === meId || isAdmin) && v.member_id === autoreId) {
+      vecchia = v;
+      const { precedenti: _p, ...genV } = v.generazione || {};
+      (generazione as any).precedenti = [...(v.generazione?.precedenti || []), { testo: v.testo, testo_generato: v.testo_generato, ganci_opzioni: v.ganci_opzioni, commento: v.commento, note: v.note, fonti: v.fonti, vis: v.vis, tema: v.tema, titolo: v.titolo, hook_formula: v.hook_formula, formato: v.formato, generazione: genV }].slice(-5);
+    }
+  }
   if (g.grafica?.modello === 'carosello' && (g.grafica.slide || []).length < 3) g.grafica.modello = g.grafica.numero ? 'numero' : 'frase';   // carosello senza slide: non è un carosello
   const grafica = { ...(g.grafica || {}), stile: ['scientifico', 'friendly'].includes(g.grafica?.stile) ? g.grafica.stile : (autore.stile_grafico || 'friendly') };
 
@@ -455,6 +466,7 @@ Deno.serve(async req => {
     scheduled_at: body.scheduled_at || null, updated_by: meId,
   }).select().single();
   if (error) return json({ error: error.message }, 500);
-  await db.from('sync_log').insert({ job: 'genera-bozza', ok: true, dettagli: { post: post.id, autore: autoreId, controlli: esito.problemi.length } });
-  return json({ ok: true, post });
+  if (vecchia) await db.from('posts').delete().eq('id', vecchia.id);
+  await db.from('sync_log').insert({ job: 'genera-bozza', ok: true, dettagli: { post: post.id, autore: autoreId, controlli: esito.problemi.length, sostituisce: vecchia?.id } });
+  return json({ ok: true, post, eliminato: vecchia?.id || null });
 });

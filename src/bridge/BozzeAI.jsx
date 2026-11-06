@@ -13,7 +13,7 @@ function conGancio(post, i) {
   return g.uni.replace(/\n+$/, '') + '\n' + corpoDopoApertura(righe).join('\n');
 }
 
-export default function BozzeAI({ members, posts, me, apri, applica }) {
+export default function BozzeAI({ members, posts, me, apri, applica, rimuovi }) {
   const [chi, setChi] = useState(() => P()?.profiloAttivo() || me.id);
   const [gen, setGen] = useState({ tema: '', istruzioni: '', lingua: '' });
   const [busy, setBusy] = useState(false);
@@ -49,6 +49,7 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
     setBusy(false);
     if (!r.ok) { setErr(j.error || `Errore ${r.status}`); return; }
     applica('posts', j.post);
+    if (j.eliminato) rimuovi('posts', j.eliminato);
     if (!rifai && lingua === 'entrambe') await traduci(j.post, linguaDef === 'en' ? 'it' : 'en');
     if (!rifai) setGen({ tema: '', istruzioni: '', lingua: gen.lingua });
   }
@@ -95,13 +96,13 @@ export default function BozzeAI({ members, posts, me, apri, applica }) {
         ) : <p className="small errtxt">Puoi generare bozze solo per il tuo profilo.</p>}
       </div>
 
-      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} facts={facts} rigenera={() => genera({ member_id: p.member_id, tema: p.tema || '', lingua: p.generazione?.lingua })} traduci={traduci} busy={busy} />)}
+      {bozze.map(p => <Bozza key={p.id} post={p} chi={chi} puo={puo} apri={apri} facts={facts} rigenera={() => genera({ member_id: p.member_id, tema: p.generazione?.tema_richiesto ?? p.tema ?? '', istruzioni: p.generazione?.istruzioni || '', lingua: p.generazione?.lingua, sostituisci: p.id })} traduci={traduci} busy={busy} applica={applica} rimuovi={rimuovi} />)}
       {!bozze.length && <p className="muted">Nessuna bozza AI per {nome}.</p>}
     </div>
   );
 }
 
-function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy }) {
+function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy, applica, rimuovi }) {
   const lingua = post.generazione?.lingua || 'it';
   const [gancio, setGancio] = useState(0);
   const [slot, setSlot] = useState('');
@@ -109,6 +110,26 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy }) {
   const testo = conGancio(post, gancio);
   const prof = (P()?.profili() || []).find(x => x.id === chi);
   const liberi = (prof?.posts || []).filter(x => P()?.stato(chi, 'pubblicato', x.id) !== '1' && P()?.stato(chi, 'archiviato-subito', x.id) !== '1' && localStorage.getItem('scartato-globale-' + x.id) !== '1');
+
+  const precedenti = post.generazione?.precedenti || [];
+  async function elimina() {
+    if (!confirm('Eliminare questa bozza? Non si può recuperare.')) return;
+    const { error } = await supabase.from('posts').delete().eq('id', post.id);
+    if (error) setMsg(error.message); else rimuovi('posts', post.id);
+  }
+  async function rigeneraTesto() {
+    if (!confirm('Riscrivere questa bozza sullo stesso tema? La versione attuale resta recuperabile con «Versione precedente».')) return;
+    rigenera();
+  }
+  // scambia la versione attuale con l'ultima precedente (premendo di nuovo si torna indietro)
+  async function versionePrecedente() {
+    const p = precedenti[precedenti.length - 1]; if (!p) return;
+    const { precedenti: _x, ...genAtt } = post.generazione || {};
+    const attuale = { testo: post.testo, testo_generato: post.testo_generato, ganci_opzioni: post.ganci_opzioni, commento: post.commento, note: post.note, fonti: post.fonti, vis: post.vis, tema: post.tema, titolo: post.titolo, hook_formula: post.hook_formula, formato: post.formato, generazione: genAtt };
+    const { generazione: genP, ...campi } = p;
+    const { data, error } = await supabase.from('posts').update({ ...campi, testo_originale: p.testo_generato || p.testo, generazione: { ...genP, precedenti: [...precedenti.slice(0, -1), attuale] } }).eq('id', post.id).select().single();
+    if (error) setMsg(error.message); else applica('posts', data);
+  }
 
   async function copia() {
     try { await navigator.clipboard.writeText(testo); setMsg('Testo copiato ✓'); } catch { setMsg('Copia non riuscita'); }
@@ -152,6 +173,9 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy }) {
           <button className="btn sm" disabled={!slot} onClick={metti}>Metti nello slot</button>
         </>}
         <button className="btn ghost sm" onClick={() => apri(post.id)}>Apri con grafica</button>
+        {puo && <button className="btn ghost sm" disabled={busy} onClick={rigeneraTesto}>{busy ? '…' : '🔄 Rigenera testo'}</button>}
+        {puo && precedenti.length > 0 && <button className="btn ghost sm" onClick={versionePrecedente} title="Scambia con la versione precedente">↩ Versione precedente ({precedenti.length})</button>}
+        {puo && <button className="btn ghost sm danger" onClick={elimina}>🗑 Elimina</button>}
         {puo && <button className="btn ghost sm" disabled={busy} onClick={() => traduci(post, lingua === 'en' ? 'it' : 'en')}>{lingua === 'en' ? 'Crea versione in italiano' : 'Crea versione in inglese'}</button>}
         {msg && <span className="small">{msg}</span>}
       </div>
