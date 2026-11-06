@@ -29,7 +29,7 @@ const VINCOLI = `VINCOLI NON NEGOZIABILI (tutti gli autori):
 - NON INVENTARE NULLA: niente episodi, dialoghi, domande ricevute, citazioni di persone, aneddoti, procedure interne, strumenti, tempi o processi aziendali che non siano scritti nella SCHEDA dell'autore, nelle ISTRUZIONI o nelle FONTI. Se mancano, scrivi una riflessione o un'osservazione generale, senza fingere che sia successo qualcosa.
 - Mai citazioni numeriche tra parentesi quadre ([1], [3, 5]).
 - Il paragrafo dopo la prima riga non ripete la prima riga con altre parole: la porta avanti.
-- Numeri aziendali: al massimo 2 per post, solo se servono al tema; mai elenchi di numeri; mai nella prima riga, mai combinati tra loro o con luoghi non indicati (es. non scrivere "75 visori tra Italia e Spagna" se il dato dice solo "75 visori"), riportali esattamente come sono scritti.`;
+- Numeri aziendali: al massimo 2 per post (MAI 3 o più), solo se servono al tema; mai elenchi di numeri; mai nella prima riga, mai combinati tra loro o con luoghi non indicati (es. non scrivere "75 visori tra Italia e Spagna" se il dato dice solo "75 visori"), riportali esattamente come sono scritti.`;
 
 const REGOLE_LINKEDIN = `REGOLE LINKEDIN (studi 2025-2026 su centinaia di migliaia di post):
 - Prima riga: massimo 130 caratteri, deve reggersi da sola (su mobile LinkedIn taglia a ~140 con "vedi altro"). Concreta, vera, senza preamboli.
@@ -371,6 +371,10 @@ Deno.serve(async req => {
     for (const f of studi) { const v = f.verificato; if (!v?.primo) continue;
       for (const m of testo.matchAll(new RegExp(v.primo + '[^()\n]{0,25}?[(,]\s*(\d{4})', 'g'))) if (m[1] !== v.anno) problemi.push(`anno sbagliato per ${v.primo}: ${m[1]} invece di ${v.anno}`); }
     if (ripetuti.length >= 3) problemi.push(`frasi già usate dal team: «${ripetuti[0]}»`);
+    if ((g.numeri_aziendali_usati || []).length > 2) problemi.push(`${g.numeri_aziendali_usati.length} numeri aziendali (massimo 2)`);
+    // episodi non forniti: domande ricevute, feedback, "oggi siamo a…" (ammessi solo se l'autore li ha scritti nelle istruzioni)
+    const ep = testo.match(/(una delle domande più frequenti|spesso ci (?:chiedono|domandano)|mi (?:chiedono|domandano) spesso|quel feedback|ci porta oggi|oggi siamo a|often (?:asked|ask|encounter|hear)|a question I (?:often|frequently)|last week we|ieri (?:in|al|a) reparto)/i);
+    if (ep && !String(body.istruzioni || '').trim()) problemi.push(`episodio non presente nelle fonti («${ep[0]}»): scrivi una riflessione, non un fatto accaduto`);
     return { problemi, testo };
   };
 
@@ -416,6 +420,7 @@ Deno.serve(async req => {
     numeri_aziendali_usati: usati, numeri_valori: Object.fromEntries(usati.map((k: string) => [k, (facts || []).find(f => f.chiave === k)?.valore])), controlli: esito.problemi, claim, numeri_da_verificare: daVerificare,
     creato_da: meId, creato_il: new Date().toISOString(),
   };
+  if (g.grafica?.modello === 'carosello' && (g.grafica.slide || []).length < 3) g.grafica.modello = g.grafica.numero ? 'numero' : 'frase';   // carosello senza slide: non è un carosello
   const grafica = { ...(g.grafica || {}), stile: ['scientifico', 'friendly'].includes(g.grafica?.stile) ? g.grafica.stile : (autore.stile_grafico || 'friendly') };
 
   const { data: post, error } = await db.from('posts').insert({
