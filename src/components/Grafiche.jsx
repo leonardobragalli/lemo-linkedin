@@ -16,7 +16,7 @@ function prefIniziali(me) {
   try { return { ...TUTTI, ...JSON.parse(localStorage.getItem('lemo-stili-' + me?.id) || '{}') }; } catch { return TUTTI; }
 }
 
-export default function Grafiche({ post, vecchie, onScelta, me, applica, puo }) {
+export default function Grafiche({ post, vecchie, onScelta, me, applica, puo, primaSalva }) {
   const g = post.vis?.grafica || {};
   const versioni = post.vis?.versioni?.length ? post.vis.versioni : [g];
   const idxAttuale = Math.max(0, versioni.findIndex(v => JSON.stringify(v) === JSON.stringify(g)));
@@ -62,6 +62,8 @@ export default function Grafiche({ post, vecchie, onScelta, me, applica, puo }) 
   }
   async function rigenera() {
     setBusy(true); setErr(null);
+    // il testo corretto e non ancora salvato va salvato prima: la grafica nuova si basa sul testo nel database
+    if (primaSalva && !(await primaSalva())) { setBusy(false); return; }
     const { data: s } = await supabase.auth.getSession();
     const r = await fetch(`${supabaseUrl}/functions/v1/genera-bozza`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + s.session.access_token, 'Content-Type': 'application/json' },
