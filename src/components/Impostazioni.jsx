@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase, supabaseUrl } from '../supabase.js';
 import { fmtData, avatar } from '../lib/util.js';
+import Collega from './Collega.jsx';
+import { vistaSemplice, impostaVista } from '../bridge/semplice.js';
 
 // Pagina admin: inviti, profili, numeri aziendali, fonti Notion, chiave Notion, aggiornamento conoscenza.
 async function chiamaFunzione(nome, body) {
@@ -15,15 +17,81 @@ async function chiamaFunzione(nome, body) {
   return d;
 }
 
+// Sezioni richiudibili: «Il mio account» e «Collega LinkedIn» per tutti; Team, Numeri e Fonti solo per gli admin.
+function Sezione({ titolo, aperta, children }) {
+  return (
+    <details className="lemo-sez" open={aperta}>
+      <summary>{titolo}</summary>
+      <div className="lemo-sez-corpo">{children}</div>
+    </details>
+  );
+}
+
 export default function Impostazioni({ members, me, applica, rimuovi }) {
-  if (!me.is_admin) return <section><div className="card">Questa pagina è riservata agli admin.</div></section>;
   return (
     <section>
-      <div className="toolbar"><h2>Impostazioni</h2><span className="muted small">Tutto quello che modifichi qui vale subito per tutto il team.</span></div>
-      <Inviti members={members} me={me} applica={applica} rimuovi={rimuovi} />
-      <Numeri me={me} />
-      <Fonti />
+      <div className="toolbar"><h2>Impostazioni</h2></div>
+      <Sezione titolo="Il mio account" aperta><MioAccount me={me} applica={applica} /></Sezione>
+      <Sezione titolo="Collega LinkedIn (una volta sola)"><Collega me={me} members={members} compatto /></Sezione>
+      {me.is_admin && <>
+        <Sezione titolo="Team e inviti (admin)"><Inviti members={members} me={me} applica={applica} rimuovi={rimuovi} /></Sezione>
+        <Sezione titolo="Numeri aziendali (admin)"><Numeri me={me} /></Sezione>
+        <Sezione titolo="Fonti: Notion e Lemons Insights (admin)"><Fonti /></Sezione>
+      </>}
     </section>
+  );
+}
+
+// ───────────────────────── Il mio account ─────────────────────────
+const STILI = [['vecchio', 'Stile vecchio'], ['friendly', 'Nuovo · Friendly'], ['scientifico', 'Nuovo · Scientifico']];
+function MioAccount({ me, applica }) {
+  const [stili, setStili] = useState(() => ({ vecchio: true, friendly: true, scientifico: true, ...(me.preferenze?.stili || {}) }));
+  const [lingua, setLingua] = useState(me.lingua || 'it');
+  const [msg, setMsg] = useState(null);
+  const semplice = vistaSemplice();
+
+  async function salva(patch, ok) {
+    const { data, error } = await supabase.from('team_members').update(patch).eq('id', me.id).select().single();
+    if (error) { setMsg({ err: error.message }); return; }
+    Object.assign(me, data); applica?.('team_members', data);
+    setMsg({ ok });
+  }
+  function cambiaStile(k, v) {
+    const nuovo = { ...stili, [k]: v };
+    if (!Object.values(nuovo).some(Boolean)) return;
+    setStili(nuovo);
+    try { localStorage.setItem('lemo-stili-' + me.id, JSON.stringify(nuovo)); } catch { /* niente */ }
+    salva({ preferenze: { ...(me.preferenze || {}), stili: nuovo } }, 'Stili salvati ✓');
+  }
+  function comando(os, btn) {
+    if (typeof window.scaricaComandoTerminaleRete === 'function') window.scaricaComandoTerminaleRete(btn, os);
+    else setMsg({ err: 'Comando non disponibile: ricarica la pagina' });
+  }
+
+  return (
+    <div>
+      <div className="row tight" style={{ flexWrap: 'wrap', marginBottom: 10 }}>
+        <b style={{ minWidth: 150 }}>Lingua dei miei post</b>
+        <select value={lingua} onChange={e => { setLingua(e.target.value); salva({ lingua: e.target.value }, 'Lingua salvata ✓'); }}>
+          <option value="it">Italiano</option><option value="en">English</option><option value="entrambe">Entrambe (IT + EN)</option>
+        </select>
+      </div>
+      <div className="row tight" style={{ flexWrap: 'wrap', marginBottom: 10 }}>
+        <b style={{ minWidth: 150 }}>Stili grafici da vedere</b>
+        {STILI.map(([k, l]) => <label key={k} className="chk"><input type="checkbox" checked={!!stili[k]} onChange={e => cambiaStile(k, e.target.checked)} /> {l}</label>)}
+      </div>
+      <div className="row tight" style={{ flexWrap: 'wrap', marginBottom: 10 }}>
+        <b style={{ minWidth: 150 }}>Comando inviti rete</b>
+        <button className="btn ghost sm" onClick={e => comando('mac', e.currentTarget)}>Scarica per Mac</button>
+        <button className="btn ghost sm" onClick={e => comando('win', e.currentTarget)}>Scarica per Windows</button>
+      </div>
+      <div className="row tight" style={{ flexWrap: 'wrap' }}>
+        <b style={{ minWidth: 150 }}>Vista</b>
+        <span className="small muted">{semplice ? 'Semplice' : 'Completa (Pannello originale)'}</span>
+        <button className="btn ghost sm" onClick={() => impostaVista(!semplice)}>{semplice ? 'Passa alla vista completa' : 'Torna alla vista semplice'}</button>
+      </div>
+      {msg && <p className={msg.err ? 'errtxt small' : 'small'}>{msg.err || msg.ok}</p>}
+    </div>
   );
 }
 

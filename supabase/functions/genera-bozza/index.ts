@@ -181,8 +181,9 @@ Deno.serve(async req => {
   const autoreId: string = body.member_id || meId;
   if (autoreId !== meId && !isAdmin) return json({ error: 'Puoi generare bozze solo per te' }, 403);
   if (isAdmin && /^gemini-[a-z0-9.-]+$/.test(String(body.modello || ''))) MODEL = body.modello;  // solo per le prove
-  // riscrittura dei post del calendario (solo admin): restituisce il testo senza creare una bozza
-  const soloTesto = !!body.solo_testo && !!isAdmin;
+  // riscrittura di un post del calendario («Rigenera testo»): restituisce il testo senza creare una bozza.
+  // Ognuno sul proprio post, gli admin su tutti.
+  const soloTesto = !!body.solo_testo && (!!isAdmin || autoreId === meId);
 
   // ── azioni su una bozza esistente: traduzione e nuova versione della grafica ──
   if (body.azione === 'traduci' || body.azione === 'grafica') {

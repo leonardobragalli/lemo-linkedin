@@ -6,6 +6,7 @@ import { caricaStatoIniziale, salvaStato, ascoltaStato, telemetria } from './syn
 import OVERRIDE from './override.pannello.js?raw';
 import Login from '../components/Login.jsx';
 import Extra from './Extra.jsx';
+import { attivaSemplice } from './semplice.js';
 import './lemo-x.css';
 
 function schermo(html) {
@@ -59,7 +60,8 @@ async function avvia() {
 
   document.getElementById('lemo-gate')?.remove();
   document.documentElement.classList.remove('lemo-attesa');
-  if (!me.is_admin) document.querySelectorAll('[data-tab="impostazioni"]').forEach(b => b.remove());
+  // Impostazioni ora c'è per tutti («Il mio account»); le sezioni del team restano solo agli admin
+  try { attivaSemplice(me); } catch (e) { console.warn('[Regia] vista semplice', e); }
 
   const top = document.querySelector('.topbar');
   if (top && !top.querySelector('.lemo-account')) {

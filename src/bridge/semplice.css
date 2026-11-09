@@ -1,0 +1,76 @@
+/* Vista semplice del Pannello (proposta di semplificazione approvata da Leonardo, nov 2026).
+   Tutto è sotto html.lemo-semplice: togliendo la classe (Impostazioni → «Vista completa») torna il Pannello originale.
+   Niente viene cancellato: le parti nascoste restano nel Pannello e alcune si riaprono con «Altro». */
+
+/* ── Schede: Calendario · Nuovo post · Statistiche · Impostazioni ── */
+html.lemo-semplice .nav-seg .tab-btn[data-tab="profilo"],
+html.lemo-semplice .nav-seg .tab-btn[data-tab="strategia"],
+html.lemo-semplice .nav-seg .tab-btn[data-tab="impara"],
+html.lemo-semplice .nav-seg .tab-btn[data-tab="collega"],
+html.lemo-semplice .mob-nav [data-tab="profilo"],
+html.lemo-semplice .mob-nav [data-tab="strategia"],
+html.lemo-semplice .mob-nav [data-tab="impara"],
+html.lemo-semplice .mob-nav [data-tab="collega"] { display: none !important; }
+html.lemo-semplice .nav-seg .tab-btn { font-size: 14px; }
+html.lemo-semplice .brand-sub { display: none; }
+
+/* ── Pagina iniziale: scheda semplice ── */
+html.lemo-semplice .splash-role,
+html.lemo-semplice .prof-sel-card .ps-dept,
+html.lemo-semplice .prof-sel-card .ps-angle,
+html.lemo-semplice .prof-sel-card .psc-badges { display: none !important; }
+html.lemo-semplice .prof-sel-card .ps-role { font-size: 14px; line-height: 1.35; }
+html.lemo-semplice .prof-sel-card .ps-name { font-size: 18px; }
+html.lemo-semplice .prof-sel-card .lemo-prossimo { font: 500 13px/1.3 Runde, sans-serif; color: #FFD9BF; }
+
+/* ── Calendario ── */
+html.lemo-semplice .pipeline-dock .cmd-top { display: none; }
+html.lemo-semplice #main-rail { display: none; }
+html.lemo-semplice .studio-shell { grid-template-columns: minmax(0, 1fr); }
+html.lemo-semplice .cal-chip.fatto { opacity: .55; }
+html.lemo-semplice .post .li-meta { display: none; }
+html.lemo-semplice .post .skill-bar,
+html.lemo-semplice .post .sinergia-box,
+html.lemo-semplice .post .action-dock button.lemo-in-altro { display: none; }
+html.lemo-semplice .post.lemo-altro-aperto .skill-bar { display: block; }
+html.lemo-semplice .post.lemo-altro-aperto .sinergia-box { display: block; }
+html.lemo-semplice .post.lemo-altro-aperto .action-dock button.lemo-in-altro { display: inline-flex; }
+html.lemo-semplice .post .anteprima { font-size: 15px; line-height: 1.55; }
+html.lemo-semplice .post-h2 { font-size: 22px; }
+
+/* pulsanti aggiunti dalla piattaforma dentro il Pannello */
+.lemo-btn-pan { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #F0C9AC; background: #FFF5EE; color: #4F1D00;
+  border-radius: 8px; padding: 4px 9px; font: 600 12px/1.3 Runde, sans-serif; cursor: pointer; }
+.lemo-btn-pan:hover { background: #FFE6D3; }
+.lemo-btn-pan.pri { background: #FF8731; border-color: #FF8731; color: #fff; }
+.lemo-btn-pan[disabled] { opacity: .6; cursor: progress; }
+.lemo-msg-pan { font: 500 12px/1.3 Runde, sans-serif; color: #8A4A1F; margin-left: 6px; }
+.lemo-msg-pan.err { color: #C0392B; }
+
+/* ── Statistiche: 4 numeri e lista semplice ── */
+html.lemo-semplice #storico-prof-root > .sec-card:first-child p,
+html.lemo-semplice #storico-prof-root > .sec-card:first-child .tema,
+html.lemo-semplice #storico-prof-root > .sec-card:first-child button:not([onclick*="forzaSync"]),
+html.lemo-semplice #storico-prof-root > .sec-card:first-child a.qlink,
+html.lemo-semplice #storico-prof-root > .sec-card:not(:first-child),
+html.lemo-semplice #storico-prof-root .hist-toolbar { display: none !important; }
+html.lemo-semplice #hist-prof-kpi-wrap .hist-kpi-cell:nth-child(4),
+html.lemo-semplice #hist-prof-kpi-wrap .hist-kpi-cell:nth-child(6),
+html.lemo-semplice #hist-prof-kpi-wrap .hk-sub { display: none; }
+html.lemo-semplice .hist-metrics-grid .hm-cell:nth-child(2),
+html.lemo-semplice .hist-metrics-grid .hm-cell:nth-child(5),
+html.lemo-semplice .hist-metrics-grid .hm-cell:nth-child(6),
+html.lemo-semplice .hist-metrics-grid .hm-cell:nth-child(7),
+html.lemo-semplice .hist-metrics-grid .hm-sub,
+html.lemo-semplice .hist-metrics-grid .hm-bar-track { display: none; }
+
+/* ── Schede della piattaforma (React) ── */
+.lemo-x details.lemo-sez { background: #fff; border: 1px solid #F0E2D8; border-radius: 12px; padding: 0; margin-bottom: 12px; }
+.lemo-x details.lemo-sez > summary { cursor: pointer; padding: 14px 18px; font: 700 16px/1.3 Runde, sans-serif; color: #4F1D00; list-style: none; }
+.lemo-x details.lemo-sez > summary::-webkit-details-marker { display: none; }
+.lemo-x details.lemo-sez > summary::after { content: '▾'; float: right; color: #C49A7E; }
+.lemo-x details.lemo-sez[open] > summary::after { content: '▴'; }
+.lemo-x details.lemo-sez > .lemo-sez-corpo { padding: 0 18px 16px; }
+.lemo-x details.lemo-sez > .lemo-sez-corpo > section > .toolbar { display: none; }
+.lemo-x details.lemo-sez .lemo-sez-corpo .card { box-shadow: none; }
+.lemo-x .lemo-altro-menu { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #F0D6C4; }

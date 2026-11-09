@@ -71,16 +71,15 @@ export default function BozzeAI({ members, posts, me, apri, applica, rimuovi }) 
   return (
     <div>
       <div className="toolbar">
-        <h2>Bozze AI</h2>
+        <h2>Nuovo post</h2>
         <select value={chi} onChange={e => setChi(e.target.value)}>
           {members.map(m => <option key={m.id} value={m.id}>{m.id === me.id ? `${m.nome} (tu)` : m.nome}</option>)}
         </select>
       </div>
 
       <div className="card">
-        <h3>Nuova bozza per {nome}</h3>
-        <p className="small muted">Gemini scrive partendo dalla scheda dell'autore (ruolo, lingua, temi, voce), dagli studi di Lemons Insights e PubMed e dai numeri aziendali confermati o provvisori.
-          Controlla da solo lunghezza, prima riga, frasi già usate dal team e claim vietati; ogni numero senza fonte o provvisorio viene segnato <b>DA VERIFICARE</b>. Poi la metti in uno slot del calendario e la rifinisci lì.</p>
+        <h3>Nuovo post per {nome}</h3>
+        <p className="small muted">Scrivi un'idea (o lascia vuoto): l'AI prepara testo e grafica, tu li rivedi e li metti nel calendario.</p>
         {puo ? (
           <>
             <label>Tema (facoltativo) <input value={gen.tema} onChange={e => setGen({ ...gen, tema: e.target.value })} placeholder="es. ansia prima dei prelievi in pediatria" /></label>
@@ -107,6 +106,7 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy, applica, 
   const [gancio, setGancio] = useState(0);
   const [slot, setSlot] = useState('');
   const [msg, setMsg] = useState(null);
+  const [altro, setAltro] = useState(false);
   const testo = conGancio(post, gancio);
   const prof = (P()?.profili() || []).find(x => x.id === chi);
   const liberi = (prof?.posts || []).filter(x => P()?.stato(chi, 'pubblicato', x.id) !== '1' && P()?.stato(chi, 'archiviato-subito', x.id) !== '1' && localStorage.getItem('scartato-globale-' + x.id) !== '1');
@@ -163,22 +163,25 @@ function Bozza({ post, chi, puo, apri, facts, rigenera, traduci, busy, applica, 
         );
       })()}
       {post.fonti && <p className="small muted">Fonti: {String(post.fonti).slice(0, 400)}</p>}
-      <div className="row tight" style={{ marginTop: 8 }}>
-        <button className="btn ghost sm" onClick={copia}>Copia testo</button>
+      <div className="row tight" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+        <button className="btn sm" onClick={() => apri(post.id)}>✏️ Apri: testo e grafica</button>
         {puo && liberi.length > 0 && <>
           <select value={slot} onChange={e => setSlot(e.target.value)}>
-            <option value="">Metti nello slot del calendario…</option>
+            <option value="">Scegli il giorno…</option>
             {liberi.map(x => <option key={x.id} value={x.id}>Post {x.id} · {x.when || x.data} · {(x.titolo || '').slice(0, 50)}</option>)}
           </select>
-          <button className="btn sm" disabled={!slot} onClick={metti}>Metti nello slot</button>
+          <button className="btn orange sm" disabled={!slot} onClick={metti}>Metti nel calendario</button>
         </>}
-        <button className="btn ghost sm" onClick={() => apri(post.id)}>Apri con grafica</button>
-        {puo && <button className="btn ghost sm" disabled={busy} onClick={rigeneraTesto}>{busy ? '…' : '🔄 Rigenera testo'}</button>}
-        {puo && precedenti.length > 0 && <button className="btn ghost sm" onClick={versionePrecedente} title="Scambia con la versione precedente">↩ Versione precedente ({precedenti.length})</button>}
-        {puo && <button className="btn ghost sm danger" onClick={elimina}>🗑 Elimina</button>}
-        {puo && <button className="btn ghost sm" disabled={busy} onClick={() => traduci(post, lingua === 'en' ? 'it' : 'en')}>{lingua === 'en' ? 'Crea versione in italiano' : 'Crea versione in inglese'}</button>}
+        {puo && <button className="btn ghost sm" disabled={busy} onClick={rigeneraTesto}>{busy ? '…' : '🔄 Rigenera'}</button>}
+        <button className="btn ghost sm" onClick={() => setAltro(!altro)}>{altro ? 'Altro ▴' : 'Altro ▾'}</button>
         {msg && <span className="small">{msg}</span>}
       </div>
+      {altro && <div className="lemo-altro-menu">
+        <button className="btn ghost sm" onClick={copia}>Copia testo</button>
+        {puo && precedenti.length > 0 && <button className="btn ghost sm" onClick={versionePrecedente} title="Scambia con la versione precedente">↩ Versione precedente ({precedenti.length})</button>}
+        {puo && <button className="btn ghost sm" disabled={busy} onClick={() => traduci(post, lingua === 'en' ? 'it' : 'en')}>{lingua === 'en' ? 'Crea versione in italiano' : 'Crea versione in inglese'}</button>}
+        {puo && <button className="btn ghost sm danger" onClick={elimina}>🗑 Elimina</button>}
+      </div>}
     </div>
   );
 }

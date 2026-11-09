@@ -4,7 +4,7 @@ import { asset, fmtData } from '../lib/util.js';
 
 const URL_SCRIPT = () => new URL(asset('lemo-linkedin.user.js'), location.href).href;
 
-export default function Collega({ me, members }) {
+export default function Collega({ me, members, compatto }) {
   const [codice, setCodice] = useState(null);
   const [tokens, setTokens] = useState([]);
   const [log, setLog] = useState([]);
@@ -20,7 +20,7 @@ export default function Collega({ me, members }) {
   useEffect(() => {
     let vivo = true;
     carica().then(() => { if (!vivo) return; });
-    const ch = supabase.channel('ingest-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ingest_log' }, p => setLog(x => [p.new, ...x].slice(0, 30))).subscribe();
+    const ch = supabase.channel('ingest-live-' + Math.random().toString(36).slice(2)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ingest_log' }, p => setLog(x => [p.new, ...x].slice(0, 30))).subscribe();
     return () => { vivo = false; supabase.removeChannel(ch); };
   }, []);
 
@@ -44,12 +44,12 @@ export default function Collega({ me, members }) {
     <section>
       <div className="toolbar"><h2>Collega il tuo LinkedIn</h2><span className="muted small">Una volta sola, 3 minuti. Poi i dati dei tuoi post arrivano da soli.</span></div>
 
-      <div className="card info">
-        <b>Come funziona.</b> Un piccolo script nel tuo browser, quando apri LinkedIn, legge <b>solo le statistiche dei tuoi post</b> (impressioni, reazioni, commenti, diffusioni, follower) e le manda qui.
+      <details className="card info" open={!compatto}>
+        <summary><b>Come funziona e cosa legge</b></summary> Un piccolo script nel tuo browser, quando apri LinkedIn, legge <b>solo le statistiche dei tuoi post</b> (impressioni, reazioni, commenti, diffusioni, follower) e le manda qui.
         Non fa nessuna azione su LinkedIn (niente like, inviti, messaggi), non legge profili altrui e si ferma se LinkedIn chiede una verifica.
         Formalmente questo tipo di lettura automatica non è previsto dai termini di LinkedIn: il rischio è basso (pochi dati, solo tuoi) ma non zero.
         Se non apri LinkedIn per qualche giorno, i tuoi dati restano fermi fino al prossimo accesso.
-      </div>
+      </details>
 
       <div className="dims">
         <div className="card">
@@ -91,7 +91,7 @@ export default function Collega({ me, members }) {
         <div className="row tight">{members.map(m => <span key={m.id} className="badge" style={{ background: attivi.has(m.id) ? '#D1FAE5' : '#F3F4F6', color: attivi.has(m.id) ? '#047857' : '#6B7280' }}>{m.nome_breve || m.nome}{attivi.has(m.id) ? ' ✓' : ''}</span>)}</div>
       </div>
 
-      <div className="card">
+      {(!compatto || me.is_admin) && <div className="card">
         <h3>Ultimi invii dagli script</h3>
         {!log.length ? <p className="muted small">Ancora nessun invio.</p> : (
           <table className="tbl">
@@ -102,7 +102,7 @@ export default function Collega({ me, members }) {
             ))}</tbody>
           </table>
         )}
-      </div>
+      </div>}
     </section>
   );
 }
