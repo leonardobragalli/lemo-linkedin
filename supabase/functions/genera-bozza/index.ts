@@ -181,6 +181,8 @@ Deno.serve(async req => {
   const autoreId: string = body.member_id || meId;
   if (autoreId !== meId && !isAdmin) return json({ error: 'Puoi generare bozze solo per te' }, 403);
   if (isAdmin && /^gemini-[a-z0-9.-]+$/.test(String(body.modello || ''))) MODEL = body.modello;  // solo per le prove
+  // riscrittura dei post del calendario (solo admin): restituisce il testo senza creare una bozza
+  const soloTesto = !!body.solo_testo && !!isAdmin;
 
   // ── azioni su una bozza esistente: traduzione e nuova versione della grafica ──
   if (body.azione === 'traduci' || body.azione === 'grafica') {
@@ -324,7 +326,7 @@ Deno.serve(async req => {
   const prompt = [
     `AUTORE: ${autore.nome}, ${autore.ruolo}. LINGUA DEL POST: ${inglese ? 'INGLESE' : 'ITALIANO'}.`,
     `SCHEDA DELL'AUTORE (ruolo, temi, voce, cosa evitare: è la guida principale):\n${autore.scheda || '(nessuna scheda)'}`,
-    `TEMA RICHIESTO: ${tema || '(scegli uno dei temi della scheda, diverso dai recenti)'}${body.istruzioni ? `\nISTRUZIONI DELL'AUTORE: ${String(body.istruzioni).slice(0, 800)}` : ''}`,
+    `TEMA RICHIESTO: ${tema || '(scegli uno dei temi della scheda, diverso dai recenti)'}${body.istruzioni ? `\nISTRUZIONI DELL'AUTORE: ${String(body.istruzioni).slice(0, soloTesto ? 4000 : 800)}` : ''}`,
     recentiAutore.length ? `TEMI GIÀ USATI DALL'AUTORE (non ripeterli): ${recentiAutore.join(' | ')}` : '',
     frasiDaEvitare.length ? `FRASI CHE L'AUTORE HA GIÀ RIPETUTO TROPPO (vietato riusarle, anche parafrasate):\n${frasiDaEvitare.map(f => '- ' + f.slice(0, 200)).join('\n')}` : '',
     studiColleghi.size ? `STUDI GIÀ USATI DAI COLLEGHI QUESTA SETTIMANA (non usarli):\n${[...studiColleghi].slice(0, 12).map(s => '- ' + s).join('\n')}` : '',
@@ -450,6 +452,10 @@ Deno.serve(async req => {
   if (g.grafica?.modello === 'carosello' && (g.grafica.slide || []).length < 3) g.grafica.modello = g.grafica.numero ? 'numero' : 'frase';   // carosello senza slide: non è un carosello
   const grafica = { ...(g.grafica || {}), stile: ['scientifico', 'friendly'].includes(g.grafica?.stile) ? g.grafica.stile : (autore.stile_grafico || 'friendly') };
 
+  if (soloTesto) {
+    await db.from('sync_log').insert({ job: 'genera-bozza', ok: true, dettagli: { riscrittura: body.post_id || null, autore: autoreId, controlli: esito.problemi } });
+    return json({ ok: true, testo, grafica, note: nota, controlli: esito.problemi, numeri_aziendali_usati: usati });
+  }
   const { data: post, error } = await db.from('posts').insert({
     member_id: autoreId, origine: 'nuovo', stato: 'da_rivedere',
     titolo: (g.tema || g.aperture[0].testo).slice(0, 120), tema: g.tema,
