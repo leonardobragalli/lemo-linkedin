@@ -167,7 +167,40 @@ Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   const KEY = Deno.env.get('GEMINI_API_KEY');
   if (!KEY) return json({ error: 'Chiave Gemini non configurata (GEMINI_API_KEY nei secrets).' }, 503);
-  let MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+  // gemini-2.5-flash dismesso dal 1/12/2026: si usa 3.8 Flash (piano gratuito); 3.6 Flash di riserva quando 3.8 è al limite
+  // o si inceppa (con alcuni autori 3.8 ripete parole fino al limite di token: provato il 10/11/2026)
+const MODELLO_PREDEFINITO = 'gemini-3.8-flash';
+const MODELLO_RISERVA = 'gemini-3.6-flash';
+const envModello = Deno.env.get('GEMINI_MODEL') || '';
+let MODEL = envModello && !/^gemini-2\./.test(envModello) ? envModello : MODELLO_PREDEFINITO;
+// Dai modelli 3.x: niente temperature, thinking_level al posto di thinking_budget
+function configGenerazione(modello: string, schema: any, pensiero: 'low' | 'medium') {
+  if (/^gemini-2\./.test(modello)) return { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 3500, temperature: 1.0, thinkingConfig: { thinkingBudget: pensiero === 'low' ? 512 : 1024 } };
+  // 3.x: JSON Schema vero (rispetta maxLength); con responseSchema i campi corti a volte si allungano senza fine
+  return { responseMimeType: 'application/json', responseJsonSchema: jsonSchema(schema), maxOutputTokens: 3500, thinkingConfig: { thinkingLevel: pensiero } };
+}
+function jsonSchema(x: any): any {
+  if (Array.isArray(x)) return x.map(jsonSchema);
+  if (!x || typeof x !== 'object') return x;
+  const o: any = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (k === 'type' && typeof v === 'string') o.type = v.toLowerCase();
+    else if (k === 'nullable') continue;
+    else o[k] = jsonSchema(v);
+  }
+  if (x.nullable && o.type) o.type = [o.type, 'null'];
+  return o;
+}
+// chiamata a Gemini con passaggio al modello di riserva se il principale è al limite (429) o non disponibile (404)
+async function gemini(modello: string, corpo: (m: string) => any, ms: number): Promise<{ r: Response, modello: string }> {
+  const url = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+  let r = await fetch(url(modello), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY }, signal: AbortSignal.timeout(ms), body: JSON.stringify(corpo(modello)) });
+  if ((r.status === 429 || r.status === 404) && modello !== MODELLO_RISERVA) {
+    r = await fetch(url(MODELLO_RISERVA), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY }, signal: AbortSignal.timeout(ms), body: JSON.stringify(corpo(MODELLO_RISERVA)) });
+    return { r, modello: MODELLO_RISERVA };
+  }
+  return { r, modello };
+}
 
   const auth = req.headers.get('authorization') || '';
   const utente = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
@@ -192,10 +225,7 @@ Deno.serve(async req => {
     if (orig.member_id !== meId && !isAdmin) return json({ error: 'Puoi modificare solo le tue bozze' }, 403);
     const linguaOrig = orig.generazione?.lingua || 'it';
     const chiamaSemplice = async (sistema: string, testo: string, schema: any, tentativo = 1): Promise<any> => {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY }, signal: AbortSignal.timeout(90000),
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: testo }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 1.0, maxOutputTokens: 6000, thinkingConfig: { thinkingBudget: 512 } } }),
-      });
+      const { r } = await gemini(MODEL, (m) => ({ systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: testo }] }], generationConfig: configGenerazione(m, schema, 'low') }), 90000);
       if (!r.ok) throw new Error(r.status === 429 ? 'Limite del piano gratuito Gemini raggiunto: riprova tra qualche minuto' : `Errore Gemini ${r.status}`);
       const out = await r.json();
       const txt = (out.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || '').join('');
@@ -345,16 +375,20 @@ Deno.serve(async req => {
 
   const VOICE = await leggiVoice();
   const sistema = `Sei il ghostwriter LinkedIn del team di Lemons in the room. Scrivi nella voce dell'autore indicato, seguendo la sua SCHEDA.\n\n${VINCOLI}\n\n${REGOLE_LINKEDIN}\n\nREGOLE SULLE EVIDENZE (dal documento di Matteo Era: valgono per tutti; la parte sulla voce personale vale solo per Matteo):\n${VOICE.slice(0, 7000)}`;
-  const chiama = async (testoUtente: string, ms: number) => {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY }, signal: AbortSignal.timeout(ms),
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: testoUtente }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 1.0, maxOutputTokens: 6000, thinkingConfig: { thinkingBudget: 1024 } } }),
-    });
+  let modelloUsato = MODEL;
+  const chiama = async (testoUtente: string, ms: number, forza?: string): Promise<any> => {
+    const t0 = Date.now();
+    const { r, modello: usato } = await gemini(forza || MODEL, (m) => ({ systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: testoUtente }] }], generationConfig: configGenerazione(m, SCHEMA, 'low') }), ms);
+    modelloUsato = usato;
     if (!r.ok) { const t = await r.text(); await db.from('sync_log').insert({ job: 'genera-bozza', ok: false, dettagli: { status: r.status, errore: t.slice(0, 500) } }); throw new Error(r.status === 429 ? 'Limite del piano gratuito Gemini raggiunto: riprova tra qualche minuto' : `Errore Gemini ${r.status}`); }
     const out = await r.json();
     const txt = (out.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || '').join('');
     try { return JSON.parse(txt); }
-    catch { await db.from('sync_log').insert({ job: 'genera-bozza', ok: false, dettagli: { fine: out.candidates?.[0]?.finishReason, uso: out.usageMetadata, caratteri: txt.length, inizio: txt.slice(0, 3500), coda: txt.slice(-400) } }); throw new Error('Risposta AI non valida (' + (out.candidates?.[0]?.finishReason || '?') + '): riprova'); }
+    catch {
+      await db.from('sync_log').insert({ job: 'genera-bozza', ok: false, dettagli: { modello: usato, fine: out.candidates?.[0]?.finishReason, uso: out.usageMetadata, caratteri: txt.length, inizio: txt.slice(0, 3500), coda: txt.slice(-400) } });
+      const resta = ms - (Date.now() - t0);
+      if (usato !== MODELLO_RISERVA && resta > 20000) return chiama(testoUtente, resta, MODELLO_RISERVA);
+      throw new Error('Risposta AI non valida (' + (out.candidates?.[0]?.finishReason || '?') + '): riprova'); }
   };
 
   // controlli automatici sul risultato
@@ -434,7 +468,7 @@ Deno.serve(async req => {
   const nota = avvisi.length ? `DA VERIFICARE prima di pubblicare: ${avvisi.join('; ')}` : null;
 
   const generazione = {
-    versione: 3, modello: MODEL, lingua: inglese ? 'en' : 'it', esplorazione, apertura_provata: esplorazione ? aperturaDaProvare : null,
+    versione: 3, modello: modelloUsato, lingua: inglese ? 'en' : 'it', esplorazione, apertura_provata: esplorazione ? aperturaDaProvare : null,
     fonti_usate: fonti.map(f => ({ id: f.id, titolo: f.titolo, url: f.url })),
     numeri_aziendali_usati: usati, numeri_valori: Object.fromEntries(usati.map((k: string) => [k, (facts || []).find(f => f.chiave === k)?.valore])), controlli: esito.problemi, claim, numeri_da_verificare: daVerificare,
     creato_da: meId, creato_il: new Date().toISOString(),
